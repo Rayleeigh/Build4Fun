@@ -1,0 +1,132 @@
+# Build4Fun Noncommercial Source-Available License
+> Version 1.1 — September 30, 2026
+
+Copyright (c) 2026 rayleeigh. All rights reserved except as granted below.
+
+Repository: https://github.com/rayleeigh/build4fun
+
+License inspiration and status
+
+This custom license is inspired by the source-sharing, same-license
+redistribution, and change-notice principles of the GNU General Public License,
+version 3 (GPL-3.0), published by the Free Software Foundation:
+https://www.gnu.org/licenses/gpl-3.0.html
+
+It is independently worded and is not GPL-3.0, is not endorsed by its authors,
+and does not incorporate GPL-3.0 by reference or offer it as an alternative
+license. Unlike GPL-3.0, this license prohibits commercial use by anyone other
+than the Owner. It is therefore a source-available license, not an open-source
+license. These restrictions cannot be added to third-party GPL-covered material
+to override the rights granted by that material's license.
+
+1. Scope and owner
+
+"Material" means the code, documentation, examples, educational content, and
+other original material in this repository made available under this license.
+"Owner" means the original repository owner identified by the GitHub account
+rayleeigh, not the owner of a fork, mirror, or redistributed copy.
+"You" means any person or entity exercising permissions under this license.
+
+Separately licensed third-party material remains governed by its own license.
+This license grants only rights that the applicable copyright holder can grant.
+
+2. Noncommercial permission
+
+Subject to these terms, you receive a worldwide, royalty-free, nonexclusive
+copyright license to access, use, copy, study, modify, and redistribute
+the Material and adaptations of it solely for noncommercial purposes, including
+personal learning, experimentation, and free noncommercial education.
+
+"Noncommercial" means not intended for or directed toward commercial advantage,
+monetary compensation, or business use. Making something available at no charge
+does not by itself make its use noncommercial.
+
+3. Commercial use prohibited; owner exception
+
+Commercial use of the Material or adaptations of it by anyone other than the
+Owner is strictly prohibited under this license. Prohibited uses include:
+
+- Selling, licensing for a fee, or commercially repackaging the Material or
+  adaptations of it, whether alone or bundled with other material.
+- Using, reproducing, or adapting the Material to create, deliver, promote, or
+  sell paid courses, workshops, tutorials, training programs, or subscriptions.
+- Incorporating the Material or adaptations into commercial products, services,
+  hosted offerings, consulting deliverables, or internal business operations.
+- Monetizing the Material or adaptations through advertising, sponsorships,
+  paywalls, or other arrangements directed toward commercial advantage.
+
+The Owner retains the right to commercially use and separately license material
+in which the Owner holds the necessary rights. This exception does not transfer
+ownership of contributions or third-party material to the Owner.
+
+Attribution does not authorize commercial use. Any commercial rights for another
+party must come from a separate written agreement with the relevant rights
+holder; this license itself grants none.
+
+4. Attribution and redistribution
+
+When sharing the Material or adaptations, you must:
+
+- Retain this license and all applicable copyright and attribution notices.
+- Clearly credit Build4Fun and rayleeigh and include the repository URL in a
+  reasonably visible location, such as a README, credits page, or course page.
+- Clearly identify modified files or materials, describe the changes, give
+  their dates, and avoid implying endorsement by the Owner.
+- Distribute the Material and adaptations under this same license. You may not
+  grant recipients commercial rights or remove these restrictions.
+- Supply the corresponding editable source for any Material or adaptations
+  you distribute, including compiled or packaged versions. Source means the
+  preferred form for making changes, including custom build scripts and other
+  files needed to build or modify the distributed version. Provide it alongside
+  the distribution or through a free download available to recipients for as
+  long as you distribute that version. A link to the original repository is
+  insufficient if it does not contain the source for your distributed version.
+
+These source-sharing requirements apply to the Material and adaptations, not
+to independent works merely distributed alongside them. Private modifications
+need not be published. Each recipient receives permissions directly from the
+applicable rights holder under this license, subject to its conditions.
+
+Suggested credit:
+"Based on Build4Fun by rayleeigh: https://github.com/rayleeigh/build4fun"
+
+5. Independently created work inspired by Build4Fun
+
+If an independently created course, product, or other money-making project is
+inspired by Build4Fun without using protected Material, the Owner requests a
+clear acknowledgment and link, for example:
+"Inspired by Build4Fun: https://github.com/rayleeigh/build4fun"
+
+This acknowledgment is a request, not a condition imposed on independently
+created work that requires no permission under this license. This license does
+not claim exclusive rights over ideas, concepts, methods, or general knowledge.
+Calling a work "inspired by" Build4Fun does not exempt copying or adaptation of
+protected Material from the commercial-use prohibition or attribution terms.
+
+6. Reserved rights and statutory exceptions
+
+All rights not expressly granted are reserved. No trademark or endorsement
+rights are granted. Nothing in this license limits uses permitted by applicable
+law without permission, including applicable copyright exceptions and
+limitations.
+
+7. Termination
+
+Your permissions under this license terminate automatically if you violate its
+terms. Upon termination, you must stop exercising the permissions granted by
+this license. Reinstatement requires written permission from the applicable
+rights holder. Termination does not affect rights arising independently under
+applicable law.
+
+8. Disclaimer of warranty and limitation of liability
+
+TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, THE MATERIAL IS PROVIDED
+"AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING WARRANTIES
+OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+DAMAGES, OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT, OR
+OTHERWISE, ARISING FROM, OUT OF, OR IN CONNECTION WITH THE MATERIAL OR ITS USE
+OR OTHER DEALINGS IN THE MATERIAL.
+
+This is a custom source-available license with noncommercial restrictions.
+It is not an open-source license under the Open Source Initiative definition.
