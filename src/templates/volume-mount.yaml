@@ -1,0 +1,15 @@
+id: volume-mount
+version: 1
+label: Volume mount
+help: Attach a declared named volume at a path inside the container.
+op: append
+target: volumes
+inputs:
+  - {key: source, label: Named volume, type: text, reference: volumes}
+  - {key: target, label: Container path, type: text, pattern: '/.+'}
+  - {key: readOnly, label: Read only, type: boolean}
+template:
+  type: volume
+  source: {input: source}
+  target: {input: target}
+  read_only: {input: readOnly}

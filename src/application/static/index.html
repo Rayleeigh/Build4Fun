@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Build4Fun · Workspace</title><link rel="stylesheet" href="/style.css"></head>
+<body>
+<header><div><strong>Build4Fun</strong><span class="subtitle">Build it. Understand it.</span></div><div><span id="save-status">Loading…</span><button id="undo" disabled title="Undo the last block addition, removal, or move">Undo</button><button id="save" disabled>Save all</button></div></header>
+<div class="layout">
+<aside><nav aria-label="Sidebar"><button id="show-blocks" aria-pressed="true">Blocks</button><button id="show-files" aria-pressed="false">Files</button></nav><div id="sidebar"></div></aside>
+<main><nav aria-label="Workspace views"><button id="canvas-tab" aria-pressed="true">Build</button><button id="file-tab" hidden>File</button><button id="preview-tab" aria-pressed="false">Compose preview</button></nav><div id="notice" role="status" aria-live="polite"></div><section id="content"></section></main>
+</div>
+<footer>Local workspace <span>Compose generation prototype · Docker execution is not connected yet</span></footer>
+<script src="/app.js"></script>
+</body></html>

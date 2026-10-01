@@ -1,0 +1,9 @@
+id: network
+version: 1
+label: Network
+help: Declare a network for Compose to create.
+op: named
+target: networks
+key: name
+inputs:
+  - {key: name, label: Network name, type: text, pattern: '[a-zA-Z0-9][a-zA-Z0-9_.-]*'}

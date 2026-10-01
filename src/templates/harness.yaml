@@ -1,0 +1,6 @@
+id: harness
+version: 1
+label: Docker Compose harness
+help: Assemble your project from individual Compose concepts.
+op: root
+children: [project-name, service, named-volume, network, external-network]

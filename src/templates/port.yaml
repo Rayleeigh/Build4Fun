@@ -1,0 +1,14 @@
+id: port
+version: 1
+label: Port mapping
+help: Map a host port to a port inside the container.
+op: append
+target: ports
+inputs:
+  - {key: published, label: Host port, type: integer, min: 1, max: 65535}
+  - {key: target, label: Container port, type: integer, min: 1, max: 65535}
+  - {key: protocol, label: Protocol, type: choice, choices: [tcp, udp]}
+template:
+  published: {input: published}
+  target: {input: target}
+  protocol: {input: protocol}

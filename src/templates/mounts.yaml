@@ -1,0 +1,8 @@
+id: mounts
+version: 1
+label: Mounts
+help: Attach persistent storage or a project file to the service.
+op: group
+target: volumes
+single: true
+children: [volume-mount, bind-mount]

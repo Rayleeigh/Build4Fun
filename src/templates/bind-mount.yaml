@@ -1,0 +1,16 @@
+id: bind-mount
+version: 1
+label: Bind mount
+help: Attach a file or folder from the project workspace.
+op: append
+target: volumes
+inputs:
+  - {key: source, label: Project path, type: text, file: true}
+  - {key: target, label: Container path, type: text, pattern: '/.+'}
+  - {key: readOnly, label: Read only, type: boolean}
+template:
+  type: bind
+  source: {input: source}
+  target: {input: target}
+  read_only: {input: readOnly}
+  bind: {create_host_path: false}

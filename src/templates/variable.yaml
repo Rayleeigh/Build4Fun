@@ -1,0 +1,11 @@
+id: variable
+version: 1
+label: Variable
+help: Enter a variable name and its value.
+op: named
+target: environment
+key: key
+inputs:
+  - {key: key, label: Variable name, type: text, pattern: '[A-Za-z_][A-Za-z0-9_]*'}
+  - {key: value, label: Value, type: text, allowEmpty: true}
+template: {input: value}

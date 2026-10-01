@@ -1,0 +1,10 @@
+id: image
+version: 1
+label: Image
+help: Enter the image reference, including its tag if needed.
+op: set
+target: image
+single: true
+inputs:
+  - {key: image, label: Image reference, type: text}
+template: {input: image}

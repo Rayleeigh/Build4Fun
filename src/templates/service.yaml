@@ -1,0 +1,10 @@
+id: service
+version: 1
+label: Service
+help: Name a service, then add its image and configuration.
+op: named
+target: services
+key: name
+inputs:
+  - {key: name, label: Service name, type: text, pattern: '[a-zA-Z0-9][a-zA-Z0-9_.-]*'}
+children: [image, ports, environment, mounts, network-configuration]

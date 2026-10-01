@@ -1,0 +1,10 @@
+id: project-name
+version: 1
+label: Project name
+help: Give the environment a name.
+op: set
+target: name
+single: true
+inputs:
+  - {key: name, label: Name, type: text, pattern: '[a-z0-9][a-z0-9_-]*'}
+template: {input: name}

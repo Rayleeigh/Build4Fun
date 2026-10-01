@@ -1,0 +1,8 @@
+id: network-configuration
+version: 1
+label: Network configuration
+help: Connect this service to networks declared in the harness.
+op: group
+target: networks
+single: true
+children: [network-attachment]

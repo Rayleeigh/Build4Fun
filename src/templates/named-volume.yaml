@@ -1,0 +1,9 @@
+id: named-volume
+version: 1
+label: Named volume
+help: Declare Docker-managed storage that services can mount.
+op: named
+target: volumes
+key: name
+inputs:
+  - {key: name, label: Volume name, type: text, pattern: '[a-zA-Z0-9][a-zA-Z0-9_.-]*'}

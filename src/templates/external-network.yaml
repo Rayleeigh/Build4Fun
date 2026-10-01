@@ -1,0 +1,13 @@
+id: external-network
+version: 1
+label: External network
+help: Reference a network that already exists on the Docker host.
+op: named
+target: networks
+key: name
+inputs:
+  - {key: name, label: Reference name, type: text, pattern: '[a-zA-Z0-9][a-zA-Z0-9_.-]*'}
+  - {key: externalName, label: Existing Docker network name, type: text}
+template:
+  external: true
+  name: {input: externalName}

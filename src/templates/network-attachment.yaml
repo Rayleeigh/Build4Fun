@@ -1,0 +1,10 @@
+id: network-attachment
+version: 1
+label: Network attachment
+help: Select a declared network for this service.
+op: named
+target: networks
+key: network
+inputs:
+  - {key: network, label: Network, type: text, reference: networks}
+template: {}
