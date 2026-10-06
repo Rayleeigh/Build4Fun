@@ -1,0 +1,91 @@
+id: 085206a3-1846-4032-84fb-c25822c87606
+type: harness
+version: 1
+values: {}
+children:
+- id: bf78064b-700f-4512-b949-1c69f7af375d
+  type: project-name
+  version: 1
+  values:
+    name: homelab
+  children: []
+- id: 0fe8974d-523c-4d01-b628-21cc983ba4ed
+  type: service
+  version: 1
+  values:
+    name: nginx
+  children:
+  - id: 71c181e1-4b3b-444f-8035-9ec3e5c5240c
+    type: image
+    version: 1
+    values:
+      image: nginx:latest
+    children: []
+  - id: 253239de-1a54-4add-9725-b7f957674ffc
+    type: ports
+    version: 1
+    values: {}
+    children:
+    - id: 2104d010-5eca-44fd-a32f-b400c03d92e1
+      type: port
+      version: 1
+      values:
+        published: '8080'
+        target: '80'
+        protocol: tcp
+      children: []
+  - id: 38481146-e94f-4c7e-a2b0-0dd9f63dbbb4
+    type: environment
+    version: 1
+    values: {}
+    children:
+    - id: e5450ff9-c796-4998-8298-0990c1ee2340
+      type: variable
+      version: 1
+      values:
+        key: NGINX_HOST
+        value: localhost
+      children: []
+    - id: 4b63b55a-c0bc-40c9-832f-a6a4c6e99ffc
+      type: variable
+      version: 1
+      values:
+        key: NGINX_PORT
+        value: '80'
+      children: []
+  - id: e028f730-5999-4379-a675-ad85676b8d79
+    type: mounts
+    version: 1
+    values: {}
+    children:
+    - id: 18f60713-8e78-40f8-9486-d9735ea5e454
+      type: volume-mount
+      version: 1
+      values:
+        source: nginx-data
+        target: /usr/share/nginx/html
+        readOnly: true
+      children: []
+  - id: e8019055-a0bb-49d6-b2fa-5d3f76bcf5d3
+    type: network-configuration
+    version: 1
+    values: {}
+    children:
+    - id: 243b9170-5f75-4042-ba95-2ae9dd66694c
+      type: network-attachment
+      version: 1
+      values:
+        network: frontend
+      children: []
+- id: 8adb2528-85c1-4256-b2e7-b3fdc3734bc2
+  type: named-volume
+  version: 1
+  values:
+    name: nginx-data
+  children: []
+- id: 6982e63b-2a66-4d9b-b287-eb4ad82e6463
+  type: network
+  version: 1
+  values:
+    name: frontend
+  children: []

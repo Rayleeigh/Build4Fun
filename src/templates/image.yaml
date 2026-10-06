@@ -6,5 +6,5 @@ op: set
 target: image
 single: true
 inputs:
-  - {key: image, label: Image reference, type: text}
+  - {key: image, label: Image reference, type: text, help: "The image used to create the container. For example, nginx:alpine selects the nginx image with the alpine tag."}
 template: {input: image}

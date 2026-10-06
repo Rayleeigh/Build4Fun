@@ -5,9 +5,9 @@ help: Attach a declared named volume at a path inside the container.
 op: append
 target: volumes
 inputs:
-  - {key: source, label: Named volume, type: text, reference: volumes}
-  - {key: target, label: Container path, type: text, pattern: '/.+'}
-  - {key: readOnly, label: Read only, type: boolean}
+  - {key: source, label: Named volume, type: text, reference: volumes, help: "Select a named volume declared under Shared resources. Multiple services can reference the same volume."}
+  - {key: target, label: Container path, type: text, pattern: '/.+', help: "The absolute directory inside the container where this volume is mounted, for example /var/lib/mysql."}
+  - {key: readOnly, label: Read only, type: boolean, help: "Allow the container to read this volume but prevent it from writing through the mount."}
 template:
   type: volume
   source: {input: source}

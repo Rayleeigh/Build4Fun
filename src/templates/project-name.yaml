@@ -6,5 +6,5 @@ op: set
 target: name
 single: true
 inputs:
-  - {key: name, label: Name, type: text, pattern: '[a-z0-9][a-z0-9_-]*'}
+  - {key: name, label: Name, type: text, pattern: '[a-z0-9][a-z0-9_-]*', help: "Groups the services and resources into one Compose project. For example, demo becomes the prefix of generated container names."}
 template: {input: name}

@@ -1,0 +1,2 @@
+# Optional browser checks; not required to run Build4Fun.
+playwright==1.60.0

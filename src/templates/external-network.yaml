@@ -6,8 +6,8 @@ op: named
 target: networks
 key: name
 inputs:
-  - {key: name, label: Reference name, type: text, pattern: '[a-zA-Z0-9][a-zA-Z0-9_.-]*'}
-  - {key: externalName, label: Existing Docker network name, type: text}
+  - {key: name, label: Reference name, type: text, pattern: '[a-zA-Z0-9][a-zA-Z0-9_.-]*', help: "A reference used inside this Compose project to attach services to the external network."}
+  - {key: externalName, label: Existing Docker network name, type: text, help: "The exact name of a network that already exists on the Docker host. Compose will use it rather than create it."}
 template:
   external: true
   name: {input: externalName}

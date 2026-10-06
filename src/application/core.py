@@ -1,6 +1,7 @@
 """Load YAML block definitions and assemble a Compose document."""
 from pathlib import Path
 import copy
+import ipaddress
 import re
 import yaml
 
@@ -116,6 +117,7 @@ def check_structure(project, definitions):
 def compile_project(project, definitions):
     check_structure(project, definitions)
     references = []
+    missing = object()
 
     def assemble(node):
         d = definitions[node['type']]
@@ -124,6 +126,9 @@ def compile_project(project, definitions):
             raise Invalid(f'{d["label"]} [{node["id"]}]: {message}')
         for f in d.get('inputs', []):
             value = node.get('values', {}).get(f['key'], '')
+            if f.get('optional') and value in ('', None):
+                values[f['key']] = missing
+                continue
             if f['type'] == 'boolean':
                 if not isinstance(value, bool):
                     fail(f'{f["label"]} must be true or false.')
@@ -140,6 +145,16 @@ def compile_project(project, definitions):
                     fail(f'{f["label"]} has an invalid format.')
                 if f['type'] == 'choice' and value not in f['choices']:
                     fail(f'Choose a valid {f["label"]}.')
+            if f.get('format'):
+                try:
+                    if f['format'] == 'ipv4':
+                        ipaddress.IPv4Address(value)
+                    elif f['format'] == 'ipv4-network':
+                        ipaddress.IPv4Network(value)
+                    elif f['format'] == 'ip':
+                        ipaddress.ip_address(value)
+                except ValueError:
+                    fail(f'{f["label"]} must be a valid {f["format"]}.')
             values[f['key']] = value
         for f in d.get('inputs', []):
             if f.get('reference'):
@@ -148,11 +163,17 @@ def compile_project(project, definitions):
             if isinstance(value, dict):
                 if set(value) == {'input'}:
                     return values[value['input']]
-                return {k: render(v) for k, v in value.items()}
+                rendered = {k: render(v) for k, v in value.items()}
+                rendered = {k: v for k, v in rendered.items() if v is not missing}
+                return missing if value and not rendered else rendered
             if isinstance(value, list):
-                return [render(v) for v in value]
+                rendered = [render(v) for v in value]
+                rendered = [v for v in rendered if v is not missing]
+                return missing if value and not rendered else rendered
             return copy.deepcopy(value)
         result = render(d.get('template', {}))
+        if result is missing:
+            result = {}
         for child in node.get('children', []):
             cd = definitions[child['type']]
             item = assemble(child)
@@ -190,15 +211,82 @@ def compile_project(project, definitions):
         if len(targets) != len(set(targets)):
             raise Invalid(f'Service {name}: duplicate mount destination.')
         ports = service.get('ports', [])
-        for port in ports:
-            port['published'] = str(port['published'])
+        service['ports'] = [short_port(port) for port in ports] if 'ports' in service else []
+        if not ports:
+            service.pop('ports', None)
         for mount in mounts:
             if mount['type'] == 'bind':
                 source = Path(mount['source'])
                 if source.is_absolute() or '..' in source.parts or not source.parts:
                     raise Invalid(f'Service {name}: bind source must be a project-relative path.')
                 mount['source'] = './' + source.as_posix()
-    return result
+    validate_networks(result)
+    for name, service in result['services'].items():
+        result['services'][name] = ordered(service, ('image', 'build', 'command', 'restart', 'ports', 'environment', 'volumes', 'networks'))
+    for section in ('services', 'networks', 'volumes', 'configs', 'secrets'):
+        if section in result:
+            result[section] = dict(sorted(result[section].items()))
+    return ordered(result, ('name', 'services', 'networks', 'volumes', 'configs', 'secrets'))
+
+
+def ordered(value, preferred):
+    return {key: value[key] for key in list(preferred) + sorted(set(value) - set(preferred)) if key in value}
+
+
+def short_port(port):
+    host = port.get('host_ip', '')
+    if ':' in host:
+        host = f'[{host}]'
+    prefix = f'{host}:' if host else ''
+    protocol = f'/{port["protocol"]}' if port.get('protocol') else ''
+    return f'{prefix}{port["published"]}:{port["target"]}{protocol}'
+
+
+def validate_networks(config):
+    subnets = {}
+    for name, network in config.get('networks', {}).items():
+        for entry in network.get('ipam', {}).get('config', []):
+            if not entry.get('subnet'):
+                raise Invalid(f'Network {name}: a subnet is required when a gateway is set.')
+            subnet = ipaddress.IPv4Network(entry['subnet'])
+            subnets[name] = subnet
+            if entry.get('gateway'):
+                address = ipaddress.IPv4Address(entry['gateway'])
+                if address not in subnet or address in (subnet.network_address, subnet.broadcast_address):
+                    raise Invalid(f'Network {name}: gateway must be a usable address inside the subnet.')
+    assigned = set()
+    for name, service in config['services'].items():
+        for network_name, attachment in service.get('networks', {}).items():
+            value = attachment.get('ipv4_address')
+            if not value:
+                continue
+            network = config['networks'][network_name]
+            address = ipaddress.IPv4Address(value)
+            identity = (network.get('name', network_name), str(address))
+            if identity in assigned:
+                raise Invalid(f'Service {name}: duplicate static IP {value} on network {network_name}.')
+            assigned.add(identity)
+            if network.get('external'):
+                continue  # Its subnet belongs to the existing Docker network.
+            subnet = subnets.get(network_name)
+            if not subnet:
+                raise Invalid(f'Service {name}: define a subnet for network {network_name} before assigning a static IP.')
+            if address not in subnet or address in (subnet.network_address, subnet.broadcast_address):
+                raise Invalid(f'Service {name}: static IP {value} must be a usable address inside {subnet}.')
+            gateways = [e.get('gateway') for e in network.get('ipam', {}).get('config', [])]
+            if value in gateways:
+                raise Invalid(f'Service {name}: static IP cannot equal the network gateway.')
+
+
+class QuotedPort(str):
+    pass
+
+
+class ComposeDumper(yaml.SafeDumper):
+    pass
+
+
+ComposeDumper.add_representer(QuotedPort, lambda dumper, value: dumper.represent_scalar('tag:yaml.org,2002:str', value, style='"'))
 
 
 def compose_yaml(project, definitions):
@@ -211,4 +299,56 @@ def compose_yaml(project, definitions):
         if isinstance(value, dict):
             return {k: literal(v) for k, v in value.items()}
         return value
-    return yaml.safe_dump(literal(compile_project(project, definitions)), sort_keys=False)
+    result = literal(compile_project(project, definitions))
+    for service in result['services'].values():
+        if 'ports' in service:
+            service['ports'] = [QuotedPort(port) for port in service['ports']]
+    return yaml.dump(result, Dumper=ComposeDumper, sort_keys=False)
+
+
+def compose_preview(project, definitions):
+    """Return generated YAML and exact line ranges for its originating blocks."""
+    text = compose_yaml(project, definitions)
+    document = yaml.compose(text, Loader=yaml.SafeLoader)
+    paths = {}
+
+    def index(node, path=(), key_line=None):
+        start = node.start_mark.line + 1 if key_line is None else key_line
+        end = node.end_mark.line + (1 if node.end_mark.column else 0)
+        paths[path] = {'start': start, 'end': max(start, end)}
+        if isinstance(node, yaml.MappingNode):
+            for key, value in node.value:
+                index(value, path + (key.value,), key.start_mark.line + 1)
+        elif isinstance(node, yaml.SequenceNode):
+            for i, value in enumerate(node.value):
+                index(value, path + (i,))
+
+    index(document)
+    blocks = {project['id']: paths[()]}
+
+    def locate(parent, base=()):
+        counts = {}
+        for child in parent.get('children', []):
+            definition = definitions[child['type']]
+            target = definition['target']
+            operation = definition['op']
+            if operation == 'group':
+                path = base + (target,)
+                child_base = base
+            elif operation == 'named':
+                path = base + (target, child['values'][definition['key']])
+                child_base = path
+            elif operation == 'append':
+                position = counts.get(target, 0)
+                counts[target] = position + 1
+                path = base + (target, position)
+                child_base = path
+            else:
+                path = base + (target,)
+                child_base = path
+            if path in paths:
+                blocks[child['id']] = paths[path]
+            locate(child, child_base)
+
+    locate(project)
+    return {'yaml': text, 'blocks': blocks}

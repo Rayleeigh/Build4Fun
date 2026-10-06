@@ -6,6 +6,6 @@ op: named
 target: environment
 key: key
 inputs:
-  - {key: key, label: Variable name, type: text, pattern: '[A-Za-z_][A-Za-z0-9_]*'}
-  - {key: value, label: Value, type: text, allowEmpty: true}
+  - {key: key, label: Variable name, type: text, pattern: '[A-Za-z_][A-Za-z0-9_]*', help: "The environment variable name expected by the image or application, for example TZ. Check its documentation for supported names."}
+  - {key: value, label: Value, type: text, allowEmpty: true, help: "The text passed to the application for this variable, for example Europe/Zurich for TZ. Values are saved as plain text, so this is not a secret store."}
 template: {input: value}

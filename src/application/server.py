@@ -6,7 +6,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 import yaml
 
-from core import Invalid, registry, check_structure, compose_yaml, read_yaml
+from core import Invalid, registry, check_structure, compose_preview, read_yaml
 from storage import Workspace, atomic_write
 
 BASE = Path(__file__).resolve().parent
@@ -66,7 +66,7 @@ def make_handler(workspace, definitions):
                         check_structure(project, definitions)
                         self.respond(200, project)
                 elif route.path == '/api/preview' and mutation:
-                    self.respond(200, {'yaml': compose_yaml(data['project'], definitions)})
+                    self.respond(200, compose_preview(data['project'], definitions))
                 elif route.path == '/api/files' and not mutation:
                     self.respond(200, workspace.listing())
                 elif route.path == '/api/file':
@@ -75,6 +75,9 @@ def make_handler(workspace, definitions):
                         self.respond(200, {'saved': True})
                     else:
                         self.respond(200, {'content': workspace.read(query['path'][0])})
+                elif route.path == '/api/delete' and mutation:
+                    workspace.delete(data['path'])
+                    self.respond(200, {'deleted': True})
                 elif route.path == '/api/folder' and mutation:
                     workspace.path(data['path']).mkdir(parents=True, exist_ok=False)
                     self.respond(200, {'created': True})

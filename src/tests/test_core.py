@@ -40,7 +40,7 @@ class AssemblyTests(unittest.TestCase):
         result = compile_project(project, self.definitions)
         self.assertEqual(project, before)
         service = result['services']['dns']
-        self.assertEqual(service['ports'], [{'published': '1053', 'target': 53, 'protocol': 'udp'}])
+        self.assertEqual(service['ports'], ['1053:53/udp'])
         self.assertEqual(service['environment']['VALUE'], 'false: $HOME')
         self.assertEqual(service['volumes'][0]['source'], './config/dnsmasq.conf')
         self.assertTrue(service['volumes'][0]['read_only'])
@@ -50,7 +50,7 @@ class AssemblyTests(unittest.TestCase):
     def test_serialization_preserves_literal_dollars_and_strings(self):
         result = read_yaml(compose_yaml(example(), self.definitions))
         self.assertEqual(result['services']['dns']['environment']['VALUE'], 'false: $$HOME')
-        self.assertEqual(result['services']['dns']['ports'][0]['published'], '1053')
+        self.assertEqual(result['services']['dns']['ports'][0], '1053:53/udp')
 
     def test_unknown_reference(self):
         project = example()

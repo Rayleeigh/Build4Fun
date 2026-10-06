@@ -1,12 +1,38 @@
 <!doctype html>
 <html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Build4Fun · Workspace</title><link rel="stylesheet" href="/style.css"></head>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Build4Fun · Workspace</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
 <body>
-<header><div><strong>Build4Fun</strong><span class="subtitle">Build it. Understand it.</span></div><div><span id="save-status">Loading…</span><button id="undo" disabled title="Undo the last block addition, removal, or move">Undo</button><button id="save" disabled>Save all</button></div></header>
-<div class="layout">
-<aside><nav aria-label="Sidebar"><button id="show-blocks" aria-pressed="true">Blocks</button><button id="show-files" aria-pressed="false">Files</button></nav><div id="sidebar"></div></aside>
-<main><nav aria-label="Workspace views"><button id="canvas-tab" aria-pressed="true">Build</button><button id="file-tab" hidden>File</button><button id="preview-tab" aria-pressed="false">Compose preview</button></nav><div id="notice" role="status" aria-live="polite"></div><section id="content"></section></main>
-</div>
-<footer>Local workspace <span>Compose generation prototype · Docker execution is not connected yet</span></footer>
-<script src="/app.js"></script>
-</body></html>
+  <a class="skip-link" href="#workspace">Skip to workspace</a>
+  <div id="app" class="app-shell">
+    <aside id="navigation" class="sidebar" aria-label="Project navigation">
+      <div class="brand"><span class="brand-symbol" aria-hidden="true">b<span>4</span></span><strong>Build4Fun</strong></div>
+      <div class="project-identity"><span class="project-avatar" aria-hidden="true">B</span><div><strong id="sidebar-project">Untitled project</strong><span>Local workspace</span></div></div>
+      <nav id="workspace-navigation" aria-label="Workspace"></nav>
+      <div id="sidebar-content" class="sidebar-content"></div>
+      <div class="sidebar-bottom"><span class="local-indicator" aria-hidden="true"></span><span>Saved on this device</span><button id="theme" class="icon-button" aria-label="Change appearance" title="Appearance"></button></div>
+    </aside>
+    <div class="work-area">
+      <header class="workspace-toolbar">
+        <div class="toolbar-leading"><button id="toggle-sidebar" class="icon-button" aria-label="Toggle navigation" aria-expanded="true" aria-controls="navigation"></button><div class="breadcrumb"><span>Workspace</span><span aria-hidden="true">/</span><strong id="toolbar-project">Untitled project</strong></div></div>
+        <div class="toolbar-trailing"><span id="save-status" class="save-status" role="status">Loading workspace…</span><button id="undo" class="icon-button" title="Undo" aria-label="Undo last project change" disabled></button><button id="save" class="button secondary" disabled>Save all</button></div>
+      </header>
+      <main id="workspace" tabindex="-1">
+        <div class="page-heading"><div><p class="eyebrow" id="page-eyebrow">WORKSPACE</p><h1 id="page-title">Build environment</h1></div><div class="page-actions" id="page-actions"></div></div>
+        <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
+        <div id="validation-summary" hidden></div>
+        <div id="workspace-grid" class="workspace-grid"><section id="content" class="main-content" aria-label="Environment builder"></section><aside id="detail-pane" class="detail-pane" aria-label="Compose preview" hidden></aside><aside id="inspector-pane" class="builder-inspector" aria-label="Block inspector" hidden></aside></div>
+      </main>
+      <footer class="statusbar"><span id="workspace-count">No services</span><span id="validation-status">Not validated</span><span>Docker execution not connected</span></footer>
+    </div>
+  </div>
+  <dialog id="menu-dialog" class="menu-dialog" aria-label="Actions"></dialog>
+  <dialog id="form-dialog" class="form-dialog" aria-labelledby="dialog-title"></dialog>
+  <script src="/app.js"></script>
+</body>
+</html>

@@ -6,5 +6,5 @@ op: named
 target: services
 key: name
 inputs:
-  - {key: name, label: Service name, type: text, pattern: '[a-zA-Z0-9][a-zA-Z0-9_.-]*'}
+  - {key: name, label: Service name, type: text, pattern: '[a-zA-Z0-9][a-zA-Z0-9_.-]*', help: "Identifies this service in Compose. For project demo and service web, Compose normally names the first container demo-web-1. Other services on the same network can reach it as web."}
 children: [image, ports, environment, mounts, network-configuration]

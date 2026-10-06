@@ -1,10 +1,12 @@
 id: network-attachment
 version: 1
 label: Network attachment
-help: Select a declared network for this service.
+help: Attach this service to a declared network and optionally assign a static IPv4 address. For a project network, define its subnet first.
 op: named
 target: networks
 key: network
 inputs:
-  - {key: network, label: Network, type: text, reference: networks}
-template: {}
+  - {key: network, label: Network, type: text, reference: networks, help: "Select a declared project or external network for this service to join."}
+  - {key: ipv4Address, label: Static IPv4 address (optional), type: text, optional: true, format: ipv4, help: "An optional fixed IPv4 address on the selected network, for example 172.25.0.10. It must be available and within that network’s subnet. Leave empty for automatic assignment."}
+template:
+  ipv4_address: {input: ipv4Address}

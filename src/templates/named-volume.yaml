@@ -6,4 +6,4 @@ op: named
 target: volumes
 key: name
 inputs:
-  - {key: name, label: Volume name, type: text, pattern: '[a-zA-Z0-9][a-zA-Z0-9_.-]*'}
+  - {key: name, label: Volume name, type: text, pattern: '[a-zA-Z0-9][a-zA-Z0-9_.-]*', help: "A reference for Docker-managed persistent storage. For example, data can be selected by Volume mount blocks. Compose normally prefixes the actual volume name with the project name."}

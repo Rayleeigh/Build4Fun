@@ -1,6 +1,7 @@
 """Workspace-scoped persistence; file contents are deliberately not validated."""
 from pathlib import Path
 import os
+import shutil
 import tempfile
 
 from core import Invalid
@@ -44,6 +45,13 @@ class Workspace:
         if path.stat().st_size > 1024 * 1024:
             raise Invalid('This editor supports text files up to 1 MiB.')
         return path.read_text(encoding='utf-8')
+
+    def delete(self, name):
+        path = self.path(name)
+        if path.is_dir():
+            shutil.rmtree(path)
+        else:
+            path.unlink()
 
     def write(self, name, content, create=False):
         if not isinstance(content, str) or len(content.encode('utf-8')) > 1024 * 1024:

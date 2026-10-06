@@ -5,10 +5,12 @@ help: Map a host port to a port inside the container.
 op: append
 target: ports
 inputs:
-  - {key: published, label: Host port, type: integer, min: 1, max: 65535}
-  - {key: target, label: Container port, type: integer, min: 1, max: 65535}
-  - {key: protocol, label: Protocol, type: choice, choices: [tcp, udp]}
+  - {key: published, label: Host port, type: integer, min: 1, max: 65535, help: "The port you connect to on the Docker host. For example, 8080 in 8080:80."}
+  - {key: target, label: Container port, type: integer, min: 1, max: 65535, help: "The port the application listens on inside the container. For example, 80 in 8080:80. The application must actually listen on this port."}
+  - {key: protocol, label: Protocol, type: choice, choices: [tcp, udp], optional: true, placeholder: "TCP (default)", help: "The transport protocol used by this mapping. Leave empty for TCP; choose UDP when the service needs it."}
+  - {key: hostIp, label: Host IP (optional), type: text, optional: true, format: ip, help: "The host address on which to publish the port. For example, 127.0.0.1 limits it to the host. Leaving this empty normally binds all host interfaces. This does not assign an IP to the container."}
 template:
   published: {input: published}
   target: {input: target}
   protocol: {input: protocol}
+  host_ip: {input: hostIp}

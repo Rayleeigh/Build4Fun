@@ -5,9 +5,9 @@ help: Attach a file or folder from the project workspace.
 op: append
 target: volumes
 inputs:
-  - {key: source, label: Project path, type: text, file: true}
-  - {key: target, label: Container path, type: text, pattern: '/.+'}
-  - {key: readOnly, label: Read only, type: boolean}
+  - {key: source, label: Project path, type: text, file: true, help: "A file or folder relative to this project workspace, for example config/dnsmasq.conf."}
+  - {key: target, label: Container path, type: text, pattern: '/.+', help: "The absolute path where the file or folder appears inside the container, for example /etc/dnsmasq.conf."}
+  - {key: readOnly, label: Read only, type: boolean, help: "Allow the container to read this mount but prevent it from writing through the mount."}
 template:
   type: bind
   source: {input: source}

@@ -1,9 +1,16 @@
 id: network
 version: 1
-label: Network
+label: Project network
 help: Declare a network for Compose to create.
 op: named
 target: networks
 key: name
 inputs:
-  - {key: name, label: Network name, type: text, pattern: '[a-zA-Z0-9][a-zA-Z0-9_.-]*'}
+  - {key: name, label: Network name, type: text, pattern: '[a-zA-Z0-9][a-zA-Z0-9_.-]*', help: "The reference services use to attach to this project network. Compose creates the network and normally prefixes its Docker name with the project name."}
+  - {key: subnet, label: IPv4 subnet (optional), type: text, optional: true, format: ipv4-network, help: "The IPv4 address range for this network, for example 172.25.0.0/24. Define a subnet before assigning static service addresses."}
+  - {key: gateway, label: IPv4 gateway (optional), type: text, optional: true, format: ipv4, help: "The gateway address within the subnet, for example 172.25.0.1. Leave empty to let Docker choose it. Do not assign this address to a service."}
+template:
+  ipam:
+    config:
+      - subnet: {input: subnet}
+        gateway: {input: gateway}
