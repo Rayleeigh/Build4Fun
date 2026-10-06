@@ -1,18 +1,23 @@
 """Local prototype server. Run with python src/application/server.py."""
 import argparse
 import json
-from http.server import BaseHTTPRequestHandler, HTTPServer
+import os
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 import yaml
 
 from core import Invalid, registry, check_structure, compose_preview, read_yaml
 from storage import Workspace, atomic_write
+from projects import Projects
+from docker_runtime import DockerRuntime
 
 BASE = Path(__file__).resolve().parent
 
 
-def make_handler(workspace, definitions):
+def make_handler(workspace, definitions, runtime=None):
+    projects = Projects(workspace)
+    runtime = runtime or DockerRuntime(projects, definitions, os.environ.get('B4F_DOCKER', 'docker'), os.environ.get('B4F_HOST_WORKSPACE'))
     class Handler(BaseHTTPRequestHandler):
         def respond(self, status, data, content_type='application/json'):
             body = json.dumps(data).encode() if content_type == 'application/json' else data
@@ -53,9 +58,28 @@ def make_handler(workspace, definitions):
                     data = json.loads(self.rfile.read(size))
                     if not isinstance(data, dict):
                         raise Invalid('Expected a request object.')
-                project_path = workspace.root / 'project.yaml'
+                if route.path in ('/api/projects', '/api/projects/rename', '/api/projects/delete'):
+                    if mutation and route.path != '/api/projects':
+                        data['action'] = route.path.rsplit('/', 1)[-1]
+                    if not mutation:
+                        self.respond(200, projects.listing())
+                    elif data.get('action') == 'rename':
+                        self.respond(200, projects.rename(data['id'], data.get('name')))
+                    elif data.get('action') == 'delete':
+                        with runtime.lock:
+                            projects.delete(data['id'])
+                        self.respond(200, {'deleted': True})
+                    elif data.get('action', 'create') == 'create':
+                        self.respond(200, projects.create(data.get('name')))
+                    else:
+                        raise Invalid('Unknown project action.')
+                    return
+                current_workspace = projects.workspace(query.get('workspace', ['legacy'])[0])
+                project_path = current_workspace.root / 'project.yaml'
                 if route.path == '/api/definitions' and not mutation:
                     self.respond(200, definitions)
+                elif route.path == '/api/docker' and mutation:
+                    self.respond(200, runtime.execute(query.get('workspace', ['legacy'])[0], data.get('action'), data.get('project') if data.get('action') == 'validate' else None))
                 elif route.path == '/api/project':
                     if mutation:
                         check_structure(data['project'], definitions)
@@ -68,18 +92,18 @@ def make_handler(workspace, definitions):
                 elif route.path == '/api/preview' and mutation:
                     self.respond(200, compose_preview(data['project'], definitions))
                 elif route.path == '/api/files' and not mutation:
-                    self.respond(200, workspace.listing())
+                    self.respond(200, current_workspace.listing())
                 elif route.path == '/api/file':
                     if mutation:
-                        workspace.write(data['path'], data['content'], data.get('create', False))
+                        current_workspace.write(data['path'], data['content'], data.get('create', False))
                         self.respond(200, {'saved': True})
                     else:
-                        self.respond(200, {'content': workspace.read(query['path'][0])})
+                        self.respond(200, {'content': current_workspace.read(query['path'][0])})
                 elif route.path == '/api/delete' and mutation:
-                    workspace.delete(data['path'])
+                    current_workspace.delete(data['path'])
                     self.respond(200, {'deleted': True})
                 elif route.path == '/api/folder' and mutation:
-                    workspace.path(data['path']).mkdir(parents=True, exist_ok=False)
+                    current_workspace.path(data['path']).mkdir(parents=True, exist_ok=False)
                     self.respond(200, {'created': True})
                 elif not mutation and route.path in ('/', '/app.js', '/style.css'):
                     filename = {'/': 'index.html', '/app.js': 'app.js', '/style.css': 'style.css'}[route.path]
@@ -98,7 +122,7 @@ def main():
     parser.add_argument('--workspace', default=str(BASE.parents[1] / '.workspace'))
     args = parser.parse_args()
     definitions = registry(BASE.parent / 'templates')
-    server = HTTPServer(('127.0.0.1', args.port), make_handler(Workspace(args.workspace), definitions))
+    server = ThreadingHTTPServer(('127.0.0.1', args.port), make_handler(Workspace(args.workspace), definitions))
     print(f'Build4Fun: http://127.0.0.1:{args.port}', flush=True)
     try:
         server.serve_forever()

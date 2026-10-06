@@ -82,3 +82,76 @@ A Compose preview will sit alongside the block editor so apprentices can see how
 ## Maintainability
 
 To keep the implementation maintainable, the editor, block registry, harness, and Docker execution code will have separate responsibilities. Tests will focus on the shared generation logic, representative block definitions, valid and invalid nesting, repeated entries, resource references, and saving and reopening projects. This keeps the initial application small while giving it a clear path for adding new blocks and more advanced exercises.
+
+
+## UX improvement roadmap
+
+We will improve the editor in small, tested steps. The workspace navigation now
+contains Build and Files, with YAML preview inside Build. The next steps are:
+
+1. A contextual block palette that shows valid additions for the selected service,
+   group, or Compose harness. Apprentices can click to add or drag a block into a
+   compatible location. Selecting a leaf block uses its parent as the destination.
+2. Clearer nesting and drop targets so the service hierarchy is easy to follow.
+   Implemented: nested configuration rails, labeled compatible destinations,
+   active drop feedback, and cleanup after a drop or cancelled drag.
+3. Explicit New project, Open project, and Save project actions. Implemented:
+   Save project writes the active project and its file drafts; unsaved projects
+   can also be saved directly from the overview without switching. Refresh
+   returns to the landing page with no project selected; it does not restore
+   unsaved drafts. The browser warns before leaving with unsaved work.
+4. Docker validation and execution, including start, stop, status, and logs.
+   Implemented in Environment controls: explicit Compose validation, saved-project
+   deployment, on-demand status and bounded logs, and persistent-data-preserving
+   stop/removal. A deployment snapshot and ownership checks scope Docker actions
+   to the workspace.
+5. Multiple projects, each with its own blocks, files, and Compose output.
+   Basic creation, switching, and isolated storage are now implemented.
+
+Inline editing remains a planned builder improvement: common values should be
+editable directly in their blocks, with the inspector reserved for explanations
+and advanced settings. The contextual palette is the current implementation step.
+
+### Project selection and block placement
+
+The workspace Project selector switches between independent projects. New project
+creates a named workspace with its own block tree and files. Display names such as
+Project 1 are separate from Compose names such as `project-1`; stable internal IDs
+keep storage independent of both names. The original workspace remains accessible
+without moving or deleting its files.
+
+Add inside chooses where the next block belongs within the active project. The
+palette shows the few valid options directly, without a search box. Switching
+projects preserves unsaved blocks, file drafts, and undo history in memory. Save
+all writes the active project; unsaved changes in other projects still need saving
+before the page is closed or refreshed.
+
+The project overview provides New, Open, Rename, and Delete actions in a compact
+list. The sidebar keeps only the project selector and small add and management
+buttons. Renaming changes the display name without changing Compose resource
+identity. Deletion requires explicit confirmation, clears cached drafts, and
+removes only the selected project's data, including for the original workspace.
+
+Project navigation now uses an explicit Projects button instead of a dropdown.
+The overview is the place to open, create, rename, or delete projects. An empty
+workspace is shown as No project selected, not as a synthetic project entry.
+
+Startup opens the project landing page, inspired by Portainer's environment
+overview. No project is created or selected automatically. First-time users see
+Create your first project; returning users see their saved projects. Build, Files,
+and editor controls are available after explicitly creating or opening a project.
+
+The sidebar Projects section now expands and collapses a list of saved projects.
+Clicking a project opens it; the separate management button opens the overview.
+The palette has no destination dropdown. It follows the selected service or group;
+clicking Compose project in the builder restores the project-level palette.
+
+Files expands and collapses its tree directly in the sidebar. Each project's
+explorer shows only that project's files, with independent drafts, collapsed
+folders, and explorer visibility. Switching projects restores those states;
+opening a file expands its ancestors. The + action creates files or folders
+in the active project.
+
+Opening a project always opens its builder, even if its previous view was a file
+or the Environment controls. The sidebar has no separate Build item; clicking
+the active project returns to its builder while retaining file drafts.

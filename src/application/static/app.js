@@ -2,11 +2,12 @@
 /* The model remains the same; these components only change how it is presented. */
 const $ = id => document.getElementById(id);
 const state = {
-  definitions: {}, project: null, files: [], view: 'build', pane: null, selected: null,
-  previewVisible: true, revision: 0, dirty: false, saving: false, deleting: false, history: [], drafts: new Map(), file: '',
+  filesExpanded: true, projectsExpanded: true, projects: [], activeProject: null, switching: false, definitions: {}, project: null, files: [], view: 'projects', pane: null, selected: null,
+  runtimeBusy: false, runtimeOutput: '', runtimeServices: [], previewVisible: true, revision: 0, dirty: false, saving: false, deleting: false, history: [], drafts: new Map(), file: '',
   collapsed: new Set(), folders: new Set(), touched: new Set(), issues: [], validated: null,
   arriving: new Set(), preview: null, previewRevision: -1, previewError: '', drag: null, ready: false
 };
+const projectSessions = new Map();
 let previewTimer, previewRequest = 0, fileRequest = 0, noticeTimer, menuAnchor, formAnchor;
 const paths = {
   cube: 'M12 3 3 8v9l9 5 9-5V8Z M3 8l9 5 9-5 M12 13v9 M7.5 5.5l9 5',
@@ -75,16 +76,21 @@ function notify(text, error = false) {
   area.className = `notice${error ? ' error' : ''}`; area.hidden = !text;
   if (!error) noticeTimer = setTimeout(() => { area.hidden = true; }, 4500);
 }
-async function api(path, data) {
-  const response = await fetch(path, data === undefined ? {} : {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
-  if(response.status===404&&path==='/api/delete')throw new Error('The running server does not support file deletion yet. Restart the Build4Fun Python server, refresh this page, and try again.');
+async function api(path, data, workspace=state.activeProject) {
+  const endpoint=path.startsWith('/api/')&&!path.startsWith('/api/projects')&&path!=='/api/definitions'?path+(path.includes('?')?'&':'?')+'workspace='+encodeURIComponent(workspace):path;
+  const response = await fetch(endpoint, data === undefined ? {} : {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+  if(response.status===404&&(path==='/api/delete'||path==='/api/docker'||path.startsWith('/api/projects')))throw new Error('The running Build4Fun server is outdated. Restart the Python server to load the latest changes, then refresh this page.');
   const result = await response.json(); if (!response.ok) throw new Error(result.error || 'Request failed.'); return result;
 }
 function guarded(fn) { return async event => { try { await fn(event); } catch (error) { notify(error.message,true); } }; }
 function updateStatus() {
+  const landing=state.view==='projects';
+  document.querySelector('.toolbar-trailing').hidden=landing;
+  document.querySelector('.statusbar').hidden=landing;
   $('save-status').textContent = state.saving ? 'Saving…' : dirty() ? 'Unsaved changes' : 'All changes saved';
   $('save').disabled = !state.ready || state.saving || state.deleting || !dirty(); $('undo').disabled = !state.history.length;
-  $('sidebar-project').textContent = projectName(); $('toolbar-project').textContent = projectName();
+  const displayName=state.view==='projects'?'Projects':!state.activeProject?'No project selected':state.projects.find(p=>p.id===state.activeProject)?.name||projectName();
+  $('sidebar-project').textContent = displayName; $('toolbar-project').textContent = displayName;
   const count = state.project?.children.filter(n => n.type === 'service').length || 0;
   $('workspace-count').textContent = `${count} service${count === 1 ? '' : 's'}`;
   $('validation-status').textContent = state.validated === true ? '✓ Configuration checked' : state.validated === false ? 'Configuration needs attention' : 'Not validated';
@@ -215,7 +221,7 @@ function revealNode(node) {
 function selectNode(node,inspect=true) {
   state.selected=node.id;
   if(inspect){state.pane='inspector';renderDetail();}
-  syncSelection(); highlightCode();
+  syncSelection(); highlightCode(); renderNavigation();
   if(inspect)requestAnimationFrame(()=>($('inspector-pane').querySelector('input,select')||$('inspector-pane').querySelector('button'))?.focus({preventScroll:true}));
 }
 function syncSelection() { document.querySelectorAll('[data-node-id]').forEach(e=>e.classList.toggle('is-selected',e.dataset.nodeId===state.selected)); }
@@ -246,11 +252,42 @@ function destinationName(node) { const parent=parentOf(node); return parent && p
 function moveSibling(node,offset) { const parent=parentOf(node),index=parent.children.indexOf(node);transact(()=>{[parent.children[index],parent.children[index+offset]]=[parent.children[index+offset],parent.children[index]];}); }
 function moveNode(node,target) { const parent=parentOf(node); if(parent===target)return;transact(()=>{parent.children=parent.children.filter(n=>n!==node);target.children.push(node);state.collapsed.delete(target.id);});notify(`Moved to ${nameOf(target)}.`); }
 function installDrag(handle,node) { handle.draggable=true;handle.classList.add('drag-handle');handle.title='Drag to another compatible container';handle.addEventListener('dragstart',event=>{state.drag={id:node.id,type:node.type};event.dataTransfer.setData('text/plain',node.type);event.dataTransfer.effectAllowed='move';}); }
+function canDrop(parent) {
+  const moving=state.drag?.id?find(state.drag.id):null;
+  return !!(parent&&state.drag&&allowed(parent,moving).includes(state.drag.type)&&
+    (!moving||(!nodes(moving).includes(parent)&&parentOf(moving)!==parent)));
+}
+function showDropTargets() {
+  if(!state.drag)return;
+  let count=0;
+  document.querySelectorAll('[data-drop-parent]').forEach(element=>{
+    const valid=canDrop(find(element.dataset.dropParent));
+    element.classList.toggle('drop-eligible',valid);if(valid)count++;
+  });
+  const hint=$('drop-guidance');
+  if(hint)hint.textContent=count?`Drop ${state.definitions[state.drag.type].label} into a highlighted destination.`:'No compatible destination. Add a suitable service or group first.';
+}
+function clearDropTargets() {
+  state.drag=null;
+  document.querySelectorAll('.drop-target,.drop-eligible').forEach(element=>element.classList.remove('drop-target','drop-eligible'));
+  const hint=$('drop-guidance');if(hint)hint.textContent='Configuration belongs inside a service. Volumes and networks belong to the project.';
+}
 function installDrop(element,parent) {
-  function valid(){const moving=state.drag?.id?find(state.drag.id):null;return state.drag&&allowed(parent,moving).includes(state.drag.type)&&(!moving||!nodes(moving).includes(parent));}
-  element.addEventListener('dragover',event=>{if(!valid())return;event.preventDefault();event.stopPropagation();document.querySelectorAll('.drop-target').forEach(e=>e.classList.remove('drop-target'));element.classList.add('drop-target');});
-  element.addEventListener('dragleave',event=>{if(!element.contains(event.relatedTarget))element.classList.remove('drop-target');});
-  element.addEventListener('drop',event=>{if(!valid())return;event.preventDefault();event.stopPropagation();element.classList.remove('drop-target');const drag=state.drag;state.drag=null;if(drag.id)moveNode(find(drag.id),parent);else createBlock(parent,drag.type);});
+  if(!(definition(parent).children||[]).length)return;
+  element.dataset.dropParent=parent.id;
+  element.dataset.dropLabel=parent===state.project?'Compose project':destinationName(parent);
+  element.addEventListener('dragover',event=>{
+    if(!canDrop(parent))return;event.preventDefault();event.stopPropagation();
+    event.dataTransfer.dropEffect=state.drag.id?'move':'copy';
+    document.querySelectorAll('.drop-target').forEach(e=>e.classList.remove('drop-target'));element.classList.add('drop-target');
+    const hint=$('drop-guidance');if(hint)hint.textContent=`Release to ${state.drag.id?'move':'add'} ${state.definitions[state.drag.type].label} inside ${element.dataset.dropLabel}.`;
+  });
+  element.addEventListener('dragleave',event=>{if(!element.contains(event.relatedTarget)){element.classList.remove('drop-target');showDropTargets();}});
+  element.addEventListener('drop',event=>{
+    if(!canDrop(parent))return;event.preventDefault();event.stopPropagation();
+    const drag=state.drag;clearDropTargets();
+    if(drag.id)moveNode(find(drag.id),parent);else createBlock(parent,drag.type);
+  });
 }
 /* Quiet rows expose detail only in the inspector. Input metadata stays definition-driven. */
 function renderFields(holder,node,{draft=false}={}) {
@@ -343,7 +380,8 @@ function serviceCard(node) {
   const collapse=iconButton(state.collapsed.has(node.id)?'chevron':'down',`${state.collapsed.has(node.id)?'Expand':'Collapse'} ${node.values.name||'service'}`,()=>{if(state.collapsed.has(node.id))state.collapsed.delete(node.id);else state.collapsed.add(node.id);renderMain();});collapse.setAttribute('aria-expanded',!state.collapsed.has(node.id));
   meta.append(status,collapse,iconButton('more',`Actions for ${node.values.name||'service'}`,event=>nodeMenu(event.currentTarget,node)));header.append(symbol,title,meta);card.append(header);
   if(!state.collapsed.has(node.id)){
-    node.children.forEach(child=>card.append(configRow(child)));
+    const configuration=el('div',undefined,'service-configuration');configuration.setAttribute('role','group');configuration.setAttribute('aria-label',`Configuration for ${node.values.name||'service'}`);
+    node.children.forEach(child=>configuration.append(configRow(child)));card.append(configuration);
     const footer=el('div',undefined,'card-footer');const add=button('Add configuration',event=>addMenu(event.currentTarget,node),'tertiary','plus');add.disabled=!allowed(node).length;footer.append(add);card.append(footer);
   }
   return card;
@@ -352,11 +390,12 @@ function sectionHeading(title,count,action) {const h=el('div',undefined,'section
 function emptyState(title,description,action,glyph='cube') {const area=el('div',undefined,'empty-state'),symbol=el('div',undefined,'empty-symbol');symbol.append(icon(glyph));area.append(symbol,el('h2',title),el('p',description));if(action)area.append(action);return area;}
 function renderBuilder(content) {
   const project=state.project,name=project.children.find(n=>n.type==='project-name');
-  const strip=el('div',undefined,'project-strip');strip.append(icon('build'),el('span','Compose project'),el('strong',projectName()));
+  const strip=el('div',undefined,'project-strip');strip.append(icon('build'),button('Compose project',()=>{state.pane=null;selectNode(project,false);renderDetail();},'tertiary'),el('strong',projectName()));
   strip.append(button(name?'Edit name':'Set project name',()=>name?selectNode(name):createBlock(project,'project-name'),'tertiary', 'edit'));content.append(strip);
+  const hint=el('p','Configuration belongs inside a service. Volumes and networks belong to the project.','drop-guidance');hint.id='drop-guidance';hint.setAttribute('role','status');content.append(hint);
   const services=project.children.filter(n=>n.type==='service');
   content.append(sectionHeading('Services',services.length,services.length?button('Add service',()=>createBlock(project,'service'),'tertiary','plus'):null));
-  const serviceList=el('div');installDrop(serviceList,project);
+  const serviceList=el('div');
   if(!services.length)serviceList.append(emptyState('No services yet','Services are the containers that make up your environment. Start with a name and an image.',button('Add service',()=>createBlock(project,'service'),'primary','plus')));
   services.forEach(node=>serviceList.append(serviceCard(node)));content.append(serviceList);
   const projectNetworks=project.children.filter(n=>n.type==='network');
@@ -370,43 +409,93 @@ function renderBuilder(content) {
   section.append(sectionHeading('Shared resources',resources.length,button('Add resource',event=>{
     const choices=allowed(project).filter(t=>!['service','project-name','network'].includes(t));openMenu(event.currentTarget,'Add shared resource',choices.map(type=>({label:state.definitions[type].label,icon:blockIcon(type),type,action:()=>createBlock(project,type)})),true);
   },'tertiary','plus')));
-  if(resources.length){const list=el('div',undefined,'resource-list');resources.forEach(n=>list.append(configRow(n,{resource:true})));installDrop(list,project);section.append(list);}
+  if(resources.length){const list=el('div',undefined,'resource-list');resources.forEach(n=>list.append(configRow(n,{resource:true})));section.append(list);}
   else section.append(el('p','Declare named volumes or reference existing external networks here.','empty-inline'));
   content.append(section);installDrop(content,project);
 }
+function blockPalette() {
+  const palette=el('section',undefined,'block-palette');palette.setAttribute('aria-label','Block palette');
+  palette.append(el('p','ADD BLOCKS','nav-label'));
+  let parent=find(state.selected)||state.project;
+  while(parent&&!(definition(parent).children||[]).length)parent=parentOf(parent);
+  parent=parent||state.project;
+  palette.append(el('p',parent===state.project?'Project-level blocks':`For ${destinationName(parent)}`,'palette-context'));
+  const list=el('div',undefined,'palette-blocks');palette.append(list);
+  const populate=()=>{
+    list.replaceChildren();
+    const options=allowed(parent);
+    for(const type of options){
+      const d=state.definitions[type];
+      const add=button(d.label,()=>createBlock(parent,type),'secondary',blockIcon(type));
+      add.setAttribute('aria-label',`Add ${d.label} to ${parent===state.project?'Compose project':nameOf(parent)}`);
+      add.title=d.help||d.label;add.draggable=true;
+      add.addEventListener('dragstart',event=>{state.drag={type};event.dataTransfer.setData('text/plain',type);event.dataTransfer.effectAllowed='copy';});
+      list.append(add);
+    }
+    if(!options.length)list.append(el('p','All available blocks are already added here.','empty-inline'));
+  };
+  populate();
+  palette.append(el('p','Click to add here, or drag into a compatible block.','palette-hint'));
+  return palette;
+}
 function renderNavigation() {
   const nav=$('workspace-navigation');nav.replaceChildren(el('p','WORKSPACE','nav-label'));
-  for(const [name,label,glyph] of [['build','Build','build'],['files','Files','folder']]){
-    const b=el('button',undefined,'nav-row');b.type='button';b.append(icon(glyph),el('span',label));b.setAttribute('aria-current',(state.view===name||(state.view==='compose'&&name==='build')||(state.view==='file'&&name==='files'))?'page':'false');
-    if(name==='files')b.append(el('span',String(state.files.filter(f=>!f.directory).length),'count'));
-    b.addEventListener('click',()=>navigate(name));nav.append(b);
+  const projectRow=el('div',undefined,'projects-navigation');
+  const projects=button('Projects',()=>{state.projectsExpanded=!state.projectsExpanded;renderNavigation();$('projects-toggle').focus();},'tertiary',state.projectsExpanded?'down':'chevron');projects.id='projects-toggle';projects.className='nav-row';projects.setAttribute('aria-expanded',String(state.projectsExpanded));projects.setAttribute('aria-controls','project-tree');
+  projectRow.append(projects,iconButton('more','Manage projects',()=>navigate('projects')));
+  if(state.view!=='projects')projectRow.append(iconButton('plus','New project',newProject));
+  nav.append(projectRow);
+  const tree=el('div',undefined,'project-tree');tree.id='project-tree';tree.hidden=!state.projectsExpanded;
+  for(const project of state.projects){
+    const entry=button(project.name,guarded(async()=>{
+      await switchProject(project.id);state.selected=null;state.pane=null;navigate('build');
+    }),'tertiary','build');entry.className='nav-row project-tree-entry';entry.title=project.name;
+    entry.setAttribute('aria-current',project.id===state.activeProject?'page':'false');tree.append(entry);
+  }
+  if(!state.projects.length)tree.append(el('p','No projects yet.','empty-inline'));
+  nav.append(tree);
+  if(state.activeProject){
+    const fileHeader=el('div',undefined,'files-navigation');
+    const toggle=button('Files',()=>{state.filesExpanded=!state.filesExpanded;renderNavigation();$('files-toggle').focus();},'tertiary',state.filesExpanded?'down':'chevron');
+    toggle.id='files-toggle';toggle.className='nav-row';toggle.setAttribute('aria-label','Files');toggle.setAttribute('aria-expanded',String(state.filesExpanded));toggle.setAttribute('aria-controls','project-files');
+    toggle.append(el('span',String(state.files.filter(file=>!file.directory).length),'count'));
+    fileHeader.append(toggle,iconButton('plus','Create file or folder',event=>fileMenu(event.currentTarget)));nav.append(fileHeader);
+    const explorer=el('div',undefined,'project-files');explorer.id='project-files';explorer.hidden=!state.filesExpanded;
+    const projectLabel=state.projects.find(project=>project.id===state.activeProject)?.name||projectName();
+    explorer.setAttribute('aria-label',`Files for ${projectLabel}`);
+    explorer.append(el('p',projectLabel,'explorer-project-name'),renderFileTree());
+    if(!state.files.length)explorer.append(el('p','No files yet. Use + to add a file or folder.','empty-inline'));
+    nav.append(explorer);
   }
   const side=$('sidebar-content');side.replaceChildren();
-  const heading=el('div',undefined,'filetree-header');
-  heading.append(el('p','FILE EXPLORER','nav-label'),iconButton('plus','Create file or folder',event=>fileMenu(event.currentTarget)));
-  side.append(heading,renderFileTree());
-  if(!state.files.length)side.append(el('p','Create a file or folder using +. Your service configuration lives here.','empty-inline'));
+  if(state.view==='projects')side.append(el('p','Each project keeps its own blocks and files.','project-sidebar-note'));
+  else if(state.view==='build')side.append(blockPalette());
   updateStatus();
 }
 function renderHeading() {
-  const titles={build:['WORKSPACE','Build environment'],compose:['WORKSPACE','Build environment'],files:['PROJECT','Project files'],file:['PROJECT FILE',state.file.split('/').pop()]};
+  const titles={runtime:['PROJECT','Environment'],projects:['WORKSPACE','Projects'],build:['WORKSPACE','Build environment'],compose:['WORKSPACE','Build environment'],files:['PROJECT','Project files'],file:['PROJECT FILE',state.file.split('/').pop()]};
   $('page-eyebrow').textContent=titles[state.view][0];$('page-title').textContent=titles[state.view][1];const actions=$('page-actions');actions.replaceChildren();
   if(state.view==='build'||state.view==='compose'){
     if(state.validated===true){const badge=el('span',undefined,'validation-badge');badge.append(icon('check'),el('span','Checked'));actions.append(badge);}
-    if(!state.project.children.length&&!state.dirty)actions.append(button('Open saved project',guarded(openSavedProject),'secondary','folder'));
+    if(state.activeProject==='legacy'&&!state.project.children.length&&!state.dirty)actions.append(button('Open saved project',guarded(openSavedProject),'secondary','folder'));
     actions.append(button('Validate',guarded(validateProject),'secondary','check'));
+    actions.append(button('Environment',()=>navigate('runtime'),'secondary','cube'));
     if(state.view==='build'){
       const toggle=button(state.previewVisible?'Hide YAML':'Show YAML',()=>{
         state.previewVisible=!state.previewVisible;renderHeading();renderDetail();
       },'secondary','code');toggle.classList.add('desktop-preview-toggle');toggle.setAttribute('aria-pressed',String(state.previewVisible));actions.append(toggle);
       const yaml=button('YAML',()=>navigate('compose'),'secondary','code');yaml.classList.add('mobile-preview-toggle');actions.append(yaml);
     }else actions.append(button('Blocks',()=>navigate('build'),'secondary','build'));
-  }else if(state.view==='files')actions.append(button('New file',()=>createFile(false),'primary','plus'));
-  else { actions.append(button('Back to build',()=>navigate('build'),'secondary','build')); actions.append(button('All files',()=>navigate('files'),'secondary','folder')); }
+  }else if(state.view==='projects')actions.append(button('New project',newProject,'primary','plus'));
+  else if(state.view==='runtime')actions.append(button('Back to build',()=>navigate('build'),'secondary','build'));
+  else if(state.view==='files')actions.append(button('New file',()=>createFile(false),'primary','plus'));
+  else { actions.append(button('Back to build',()=>navigate('build'),'secondary','build')); actions.append(button('Show in explorer',()=>{state.filesExpanded=true;renderNavigation();if(innerWidth<=720)$('app').classList.add('mobile-nav');},'secondary','folder')); }
 }
 function renderMain() {
   const content=$('content');content.replaceChildren();
-  if(state.view==='build')renderBuilder(content);
+  if(state.view==='runtime')renderRuntime(content);
+  else if(state.view==='projects')renderProjects(content);
+  else if(state.view==='build')renderBuilder(content);
   else if(state.view==='compose')content.append(composePane(false));
   else if(state.view==='file')renderEditor(content);
   else{
@@ -517,7 +606,9 @@ function createFile(folder,parentPath='') {
     return ()=>{if(!input.value.trim()){input.setCustomValidity('Enter a path.');input.reportValidity();return false;}input.setCustomValidity('');return true;};
   },'Create',async()=>{
     const path=input.value.trim();await api(folder?'/api/folder':'/api/file',folder?{path}:{path,content:'',create:true});state.files=await api('/api/files');
-    if(folder){state.view='files';render();}else await openFile(path);notify(folder?'Folder created.':'File created.');
+    state.filesExpanded=true;
+    const parts=path.split('/');for(let i=1;i<=parts.length;i++)state.folders.delete(parts.slice(0,i).join('/'));
+    if(folder){render();}else await openFile(path);notify(folder?'Folder created.':'File created.');
   });
 }
 async function openFile(path) {
@@ -525,7 +616,9 @@ async function openFile(path) {
   const request=++fileRequest;
   if(!path)throw new Error('Choose a project file first.');
   if(!state.drafts.has(path)){const result=await api(`/api/file?path=${encodeURIComponent(path)}`);if(request!==fileRequest)return;state.drafts.set(path,{content:result.content,dirty:false,revision:0,caret:0,scroll:0});}
-  state.file=path;state.view='file';state.pane=null;render();
+  state.file=path;state.view='file';state.pane=null;state.filesExpanded=true;
+  const parts=path.split('/');for(let i=1;i<parts.length;i++)state.folders.delete(parts.slice(0,i).join('/'));
+  $('app').classList.remove('mobile-nav');render();
 }
 function renderEditor(content) {
   const draft=state.drafts.get(state.file),shell=el('div',undefined,'file-editor-shell'),header=el('div',undefined,'pane-header');
@@ -541,12 +634,39 @@ function renderEditor(content) {
   editor.setSelectionRange(draft.caret,draft.caret);editor.scrollTop=draft.scroll;numbers.scrollTop=draft.scroll;
 }
 async function saveAll() {
-  if(state.saving||state.deleting)return;state.saving=true;updateStatus();
+  if(!state.activeProject||state.saving||state.deleting)return;state.saving=true;updateStatus();
   try{
     if(state.dirty){const revision=state.revision;await api('/api/project',{project:state.project});if(state.revision===revision)state.dirty=false;}
     for(const [path,draft] of state.drafts){if(!draft.dirty)continue;const revision=draft.revision;await api('/api/file',{path,content:draft.content});if(draft.revision===revision)draft.dirty=false;}
-    notify(dirty()?'Saved. Newer edits are still unsaved.':'All changes saved.');renderNavigation();
-  }finally{state.saving=false;updateStatus();}
+    state.projects=await api('/api/projects');notify(dirty()?'Saved. Newer edits are still unsaved.':'All changes saved.');renderNavigation();if(state.view==='projects')renderMain();
+  }finally{state.saving=false;updateStatus();if(state.view==='projects')renderMain();}
+}
+function renderRuntime(content) {
+  content.append(el('p','Start saves this project and its edited files before applying the configuration. Stop preserves containers and data. Logs are shown as reported by the services.','runtime-intro'));
+  const actions=el('div',undefined,'runtime-actions');
+  for(const [action,label] of [['validate','Check with Docker'],['start','Start / Apply'],['stop','Stop'],['status','Refresh status'],['logs','View logs']]){
+    const control=button(label,guarded(()=>runDocker(action)),action==='start'?'primary':'secondary');control.disabled=state.runtimeBusy;actions.append(control);
+  }
+  const remove=button('Remove deployment',()=>openForm('Remove deployment?','Remove this project’s containers and Compose-managed networks. Named volumes, external networks, and project files will remain.',()=>{},'Remove deployment',()=>runDocker('remove')),'tertiary','trash');remove.disabled=state.runtimeBusy;actions.append(remove);content.append(actions);
+  if(state.runtimeBusy)content.append(el('p','Working with Docker… Image downloads can take a few minutes.','save-status'));
+  if(state.runtimeServices.length){
+    const table=el('table',undefined,'runtime-status');table.setAttribute('aria-label','Service status');
+    const header=el('tr');['Service','Container','State','Health','Exit code'].forEach(label=>header.append(el('th',label)));const head=el('thead');head.append(header);table.append(head);
+    const body=el('tbody');state.runtimeServices.forEach(service=>{const row=el('tr');[service.Service,service.Name,service.State,service.Health||'—',service.ExitCode??'—'].forEach(value=>row.append(el('td',String(value??''))));body.append(row);});table.append(body);const scroll=el('div',undefined,'runtime-table-scroll');scroll.append(table);content.append(scroll);
+  }
+  const output=el('pre',state.runtimeOutput||'Choose an action to check Docker, view service status, or read logs.','runtime-output');output.setAttribute('aria-label','Docker output');output.setAttribute('role','status');content.append(output);
+}
+async function runDocker(action) {
+  if(state.runtimeBusy||state.saving||state.deleting)return;
+  if(action==='start')await saveAll();
+  state.runtimeBusy=true;state.runtimeServices=[];renderMain();
+  try {
+    const result=await api('/api/docker',{action,...(action==='validate'?{project:state.project}:{})});
+    state.runtimeServices=result.services||[];
+    state.runtimeOutput=result.output||result.message||(result.deployed?'No containers found for this deployment.':'This project has not been deployed.');
+    if(action==='status'&&result.services?.length)state.runtimeOutput='Status refreshed from Docker.';
+  }catch(error){state.runtimeOutput=error.message;}
+  finally{state.runtimeBusy=false;if(state.view==='runtime')renderMain();}
 }
 /* Compose is generated on the server. Its source map links lines back to blocks. */
 function composePane(compact) {
@@ -590,7 +710,7 @@ async function validateProject() {
     catch(error){if(state.revision!==revision)return;const id=error.message.match(/\[([^\]]+)\]/)?.[1];const serviceName=error.message.match(/^Service ([^:]+):/)?.[1];const service=state.project.children.find(n=>n.type==='service'&&n.values.name===serviceName);state.issues=[{id:id||service?.id||state.project.id,message:error.message}];}
   }
   state.validated=!state.issues.length;render();
-  if(state.validated)notify('Block and assembly checks passed. Docker execution is not connected.');
+  if(state.validated)notify('Block and assembly checks passed. Use Check with Docker in Environment for Docker Compose validation.');
   else{const first=state.issues[0];if(first.id!==state.project.id){state.view='build';state.selected=first.id;state.pane='inspector';render();revealNode(find(first.id));}}
 }
 function undo(){if(!state.history.length)return;state.project=JSON.parse(state.history.pop());if(!find(state.selected)){state.selected=null;state.pane=null;}changed();render();notify('Last project change undone.');}
@@ -599,13 +719,113 @@ $('theme').append(icon('theme'));$('theme').onclick=event=>openMenu(event.curren
 setTheme(localStorage.getItem('build4fun-theme')||'system');matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{if((localStorage.getItem('build4fun-theme')||'system')==='system')setTheme('system');});
 $('toggle-sidebar').append(icon('sidebar'));$('toggle-sidebar').onclick=()=>{const app=$('app'),mobile=innerWidth<=720;app.classList.toggle(mobile?'mobile-nav':'nav-collapsed');$('toggle-sidebar').setAttribute('aria-expanded',mobile?app.classList.contains('mobile-nav'):!app.classList.contains('nav-collapsed'));};
 $('undo').append(icon('undo'));$('undo').onclick=undo;$('save').onclick=guarded(saveAll);
-window.addEventListener('beforeunload',event=>{if(dirty()){event.preventDefault();event.returnValue='';}});
-document.addEventListener('dragend',()=>{state.drag=null;document.querySelectorAll('.drop-target').forEach(e=>e.classList.remove('drop-target'));});
+window.addEventListener('beforeunload',event=>{if(dirty()||[...projectSessions].some(([id,s])=>id!==state.activeProject&&(s.dirty||[...s.drafts.values()].some(d=>d.dirty)))){event.preventDefault();event.returnValue='';}});
+document.addEventListener('dragstart',()=>{requestAnimationFrame(showDropTargets);});
+document.addEventListener('dragend',clearDropTargets);
+document.addEventListener('drop',clearDropTargets);
 document.addEventListener('keydown',event=>{
   if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='s'){event.preventDefault();if(state.ready)guarded(saveAll)();}
   if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='z'&&!event.target.closest('input,textarea,select')&&!$('form-dialog').open){event.preventDefault();undo();}
   if(event.key==='Escape'&&!$('form-dialog').open&&!$('menu-dialog').open&&state.pane==='inspector'){state.pane=null;renderDetail();}
 });
+const sessionKeys=['project','files','view','pane','selected','dirty','history','drafts','file','filesExpanded','collapsed','folders','touched','issues','validated','arriving'];
+async function switchProject(identity) {
+  if(identity===state.activeProject||state.switching)return;
+  if(state.saving||state.deleting||state.runtimeBusy)throw new Error('Wait for the current file operation to finish.');
+  state.switching=true;$('app').inert=true;++fileRequest;++previewRequest;clearTimeout(previewTimer);
+  try {
+    let session=projectSessions.get(identity);
+    if(!session){
+      // Explicit URLs keep these reads bound to their destination project.
+      const read=async path=>{const response=await fetch(path+'?workspace='+encodeURIComponent(identity));const result=await response.json();if(!response.ok)throw new Error(result.error);return result;};
+      const [project,files]=await Promise.all([read('/api/project'),read('/api/files')]);
+      session={project,files,view:'build',pane:null,selected:null,dirty:false,history:[],drafts:new Map(),file:'',filesExpanded:true,collapsed:new Set(nodes(project).filter(node=>definition(node).op==='group').map(node=>node.id)),folders:new Set(),touched:new Set(),issues:[],validated:null,arriving:new Set()};
+    }
+    if(state.activeProject)projectSessions.set(state.activeProject,Object.fromEntries(sessionKeys.map(key=>[key,state[key]])));
+    Object.assign(state,session);state.activeProject=identity;state.view='build';state.pane=null;
+    state.revision++;state.preview=null;state.previewRevision=-1;state.previewError='';state.drag=null;state.runtimeOutput='';state.runtimeServices=[];
+    render();
+  }finally{state.switching=false;$('app').inert=false;}
+}
+async function saveProjectFromOverview(identity) {
+  if(state.saving||state.deleting)return;
+  if(identity===state.activeProject){await saveAll();return;}
+  const session=projectSessions.get(identity);if(!session)return;
+  state.saving=true;updateStatus();renderMain();
+  try {
+    if(session.dirty){await api('/api/project',{project:session.project},identity);session.dirty=false;}
+    for(const [path,draft] of session.drafts){
+      if(!draft.dirty)continue;
+      await api('/api/file',{path,content:draft.content},identity);draft.dirty=false;
+    }
+    state.projects=await api('/api/projects');notify('Project saved.');
+  } finally {state.saving=false;updateStatus();renderMain();}
+}
+function renderProjects(content) {
+  const welcome=el('div',undefined,'landing-intro');
+  welcome.append(el('h2','Your next environment starts here.'),el('p','Create a Compose project, build it block by block, and keep its configuration files together.'));
+  content.append(welcome);
+  if(!state.projects.length){
+    content.append(emptyState('Create your first project','Start with an empty project. You choose every service, image, and configuration block.',button('Create project',newProject,'primary','plus'),'build'));return;
+  }
+  content.append(sectionHeading('Your projects',state.projects.length));
+  const list=el('div',undefined,'project-overview');
+  for(const project of state.projects){
+    const card=el('article',undefined,'project-overview-card');card.setAttribute('aria-label',project.name);card.dataset.projectId=project.id;
+    const session=project.id===state.activeProject?state:projectSessions.get(project.id);
+    const unsaved=session&&(session.dirty||[...session.drafts.values()].some(d=>d.dirty));
+    const mark=el('div',undefined,'project-mark');mark.append(icon('build'));
+    const description=el('div',undefined,'project-description');description.append(el('h2',project.name),el('p',unsaved?'Unsaved changes · save before closing':project.id===state.activeProject?'Current project':'Compose project','save-status'));
+    card.append(mark,description);
+    const actions=el('div',undefined,'project-card-actions');
+    if(unsaved){const save=button('Save project',guarded(()=>saveProjectFromOverview(project.id)),'primary','check');save.disabled=state.saving||state.deleting;actions.append(save);}
+
+    actions.append(button('Open',guarded(async()=>{await switchProject(project.id);if(project.id==='legacy'&&!state.project.children.length&&!state.dirty)await openSavedProject();navigate('build');}),'secondary','folder'),
+      button('Rename',()=>renameProject(project),'tertiary','edit'),
+      button('Delete',()=>deleteProject(project),'destructive','trash'));
+    card.append(actions);list.append(card);
+  }
+  if(!state.projects.length)list.append(el('p','No saved projects yet. Create a project to get started.','empty-inline'));
+  content.append(list);
+}
+function renameProject(project) {
+  let input;
+  openForm('Rename project','Change the display name. The Compose name, blocks, and files stay unchanged.',holder=>{
+    const label=el('label','Project name','field-label');input=el('input');input.id='rename-project';input.value=project.name;input.maxLength=80;label.htmlFor=input.id;holder.append(label,input);
+    return ()=>{input.setCustomValidity(input.value.trim()?'':'Enter a project name.');return input.reportValidity();};
+  },'Save name',async()=>{
+    const result=await api('/api/projects/rename',{action:'rename',id:project.id,name:input.value.trim()});
+    state.projects=state.projects.map(p=>p.id===project.id?result:p);render();notify('Project renamed.');
+  });
+}
+function deleteProject(project) {
+  openForm('Delete project?',`“${project.name}” and all its saved blocks, files, folders, and unsaved edits will be permanently deleted. This cannot be undone.`,()=>{},'Delete permanently',async()=>{
+    if(state.saving||state.deleting||state.runtimeBusy)throw new Error('Wait for the current file operation to finish.');
+    state.deleting=true;++fileRequest;++previewRequest;
+    try {
+      await api('/api/projects/delete',{action:'delete',id:project.id});
+      projectSessions.delete(project.id);state.projects=state.projects.filter(p=>p.id!==project.id);
+      if(state.activeProject===project.id){
+        Object.assign(state,{project:null,files:[],dirty:false,history:[],drafts:new Map(),file:'',filesExpanded:true,collapsed:new Set(),folders:new Set(),touched:new Set(),issues:[],validated:null,arriving:new Set()});
+        state.activeProject=null;state.selected=null;state.pane=null;state.revision++;state.preview=null;state.previewRevision=-1;state.previewError='';
+      }
+      state.view='projects';render();notify('Project deleted.');
+    } finally {state.deleting=false;updateStatus();}
+  });
+  $('form-dialog').querySelector('[type="submit"]').className='button danger';
+  $('form-dialog').querySelector('.dialog-actions button').focus();
+}
+function newProject() {
+  let input;
+  openForm('New project','Choose a display name, such as Project 1. A Compose-compatible name is generated automatically. Each project has its own blocks and files.',holder=>{
+    const label=el('label','Project name','field-label');input=el('input');input.id='new-project-name';label.htmlFor=input.id;input.maxLength=80;holder.append(label,input);
+    return ()=>{input.setCustomValidity(input.value.trim()?'':'Enter a project name.');return input.reportValidity();};
+  },'Create project',async()=>{
+    if(state.saving||state.deleting||state.runtimeBusy)throw new Error('Wait for the current file operation to finish.');
+    const project=await api('/api/projects',{name:input.value.trim()});state.projects.push(project);
+    await switchProject(project.id);
+  });
+}
 async function openSavedProject() {
   const revision=state.revision;
   const project=await api('/api/project');
@@ -618,8 +838,8 @@ async function openSavedProject() {
   if(!project.children.length)notify('No saved blocks yet. Start by adding a project name and service.');
 }
 guarded(async()=>{
-  [state.definitions,state.files]=await Promise.all([api('/api/definitions'),api('/api/files')]);
-  state.project={id:crypto.randomUUID(),type:'harness',version:1,values:{},children:[]};
+  [state.definitions,state.projects]=await Promise.all([api('/api/definitions'),api('/api/projects')]);
+  state.project=null;state.activeProject=null;state.view='projects';
   state.ready=true;state.selected=null;
   nodes().filter(node=>definition(node).op==='group').forEach(node=>state.collapsed.add(node.id));
   render();

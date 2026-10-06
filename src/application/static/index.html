@@ -12,23 +12,23 @@
   <div id="app" class="app-shell">
     <aside id="navigation" class="sidebar" aria-label="Project navigation">
       <div class="brand"><span class="brand-symbol" aria-hidden="true">b<span>4</span></span><strong>Build4Fun</strong></div>
-      <div class="project-identity"><span class="project-avatar" aria-hidden="true">B</span><div><strong id="sidebar-project">Untitled project</strong><span>Local workspace</span></div></div>
+      <div class="project-identity"><span class="project-avatar" aria-hidden="true">B</span><div><strong id="sidebar-project">Projects</strong><span>Local workspace</span></div></div>
       <nav id="workspace-navigation" aria-label="Workspace"></nav>
       <div id="sidebar-content" class="sidebar-content"></div>
       <div class="sidebar-bottom"><span class="local-indicator" aria-hidden="true"></span><span>Saved on this device</span><button id="theme" class="icon-button" aria-label="Change appearance" title="Appearance"></button></div>
     </aside>
     <div class="work-area">
       <header class="workspace-toolbar">
-        <div class="toolbar-leading"><button id="toggle-sidebar" class="icon-button" aria-label="Toggle navigation" aria-expanded="true" aria-controls="navigation"></button><div class="breadcrumb"><span>Workspace</span><span aria-hidden="true">/</span><strong id="toolbar-project">Untitled project</strong></div></div>
-        <div class="toolbar-trailing"><span id="save-status" class="save-status" role="status">Loading workspace…</span><button id="undo" class="icon-button" title="Undo" aria-label="Undo last project change" disabled></button><button id="save" class="button secondary" disabled>Save all</button></div>
+        <div class="toolbar-leading"><button id="toggle-sidebar" class="icon-button" aria-label="Toggle navigation" aria-expanded="true" aria-controls="navigation"></button><div class="breadcrumb"><span>Workspace</span><span aria-hidden="true">/</span><strong id="toolbar-project">Projects</strong></div></div>
+        <div class="toolbar-trailing" hidden><span id="save-status" class="save-status" role="status">Loading workspace…</span><button id="undo" class="icon-button" title="Undo" aria-label="Undo last project change" disabled></button><button id="save" class="button secondary" title="Save this project and its edited files (⌘S / Ctrl+S)" disabled>Save project</button></div>
       </header>
       <main id="workspace" tabindex="-1">
-        <div class="page-heading"><div><p class="eyebrow" id="page-eyebrow">WORKSPACE</p><h1 id="page-title">Build environment</h1></div><div class="page-actions" id="page-actions"></div></div>
+        <div class="page-heading"><div><p class="eyebrow" id="page-eyebrow">WORKSPACE</p><h1 id="page-title">Projects</h1></div><div class="page-actions" id="page-actions"></div></div>
         <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
         <div id="validation-summary" hidden></div>
         <div id="workspace-grid" class="workspace-grid"><section id="content" class="main-content" aria-label="Environment builder"></section><aside id="detail-pane" class="detail-pane" aria-label="Compose preview" hidden></aside><aside id="inspector-pane" class="builder-inspector" aria-label="Block inspector" hidden></aside></div>
       </main>
-      <footer class="statusbar"><span id="workspace-count">No services</span><span id="validation-status">Not validated</span><span>Docker execution not connected</span></footer>
+      <footer class="statusbar" hidden><span id="workspace-count">No services</span><span id="validation-status">Not validated</span><span>Local Docker Engine</span></footer>
     </div>
   </div>
   <dialog id="menu-dialog" class="menu-dialog" aria-label="Actions"></dialog>
