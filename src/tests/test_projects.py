@@ -65,3 +65,60 @@ class ProjectTests(unittest.TestCase):
             projects.delete(first['id'])
             self.assertFalse(workspace.root.exists())
             self.assertEqual(projects.listing(), [second])
+
+    def test_saved_compose_outputs_and_identical_file_paths_are_isolated(self):
+        from test_core import block, registry, TEMPLATES
+        with tempfile.TemporaryDirectory() as root:
+            projects = Projects(Workspace(root))
+            definitions = registry(TEMPLATES)
+            ids = [projects.create(name)['id'] for name in ('First', 'Second')]
+            for identity, image in zip(ids, ('nginx:alpine', 'busybox:latest')):
+                workspace = projects.workspace(identity)
+                document = read_yaml((workspace.root / 'project.yaml').read_text())
+                document['children'].append(block('service', {'name': 'same-service'}, block('image', {'image': image}),
+                    block('mounts', {}, block('bind-mount', {'source': 'same.conf', 'target': '/etc/app.conf', 'readOnly': True}))))
+                workspace.write('same.conf', image)
+                result = projects.save(identity, document, definitions)
+                self.assertTrue(result['composeGenerated'])
+                compose = read_yaml((workspace.root / 'compose.yaml').read_text())
+                self.assertEqual(compose['services']['same-service']['image'], image)
+                self.assertEqual(compose['services']['same-service']['volumes'][0]['source'], './files/same.conf')
+            projects.delete(ids[0])
+            remaining = projects.workspace(ids[1])
+            self.assertEqual(remaining.read('same.conf'), 'busybox:latest')
+            self.assertTrue((remaining.root / 'compose.yaml').exists())
+
+    def test_incomplete_save_removes_stale_output_but_preserves_deployment(self):
+        from test_core import block, registry, TEMPLATES
+        import json
+        with tempfile.TemporaryDirectory() as root:
+            projects = Projects(Workspace(root))
+            identity = projects.create('Example')['id']
+            workspace = projects.workspace(identity)
+            document = read_yaml((workspace.root / 'project.yaml').read_text())
+            document['children'].append(block('service', {'name': 'worker'}, block('image', {'image': 'busybox'})))
+            projects.save(identity, document, registry(TEMPLATES))
+            (workspace.root / 'deployment.json').write_text(json.dumps({'name': 'example', 'endpoint': 'unix:///test'}))
+            (workspace.root / 'compose.deployed.yaml').write_text('deployed snapshot')
+            document['children'][-1]['children'][0]['values']['image'] = ''
+            result = projects.save(identity, document, registry(TEMPLATES))
+            self.assertFalse(result['composeGenerated'])
+            self.assertFalse((workspace.root / 'compose.yaml').exists())
+            self.assertEqual((workspace.root / 'compose.deployed.yaml').read_text(), 'deployed snapshot')
+            document['children'][0]['values']['name'] = 'renamed'
+            with self.assertRaisesRegex(Invalid, 'existing deployment'):
+                projects.save(identity, document, registry(TEMPLATES))
+
+    def test_duplicate_compose_name_is_rejected_without_overwriting(self):
+        from test_core import registry, TEMPLATES
+        with tempfile.TemporaryDirectory() as root:
+            projects = Projects(Workspace(root))
+            projects.create('First')
+            second = projects.create('Second')['id']
+            path = projects.workspace(second).root / 'project.yaml'
+            original = path.read_text()
+            document = read_yaml(original)
+            document['children'][0]['values']['name'] = 'first'
+            with self.assertRaisesRegex(Invalid, 'already assigned'):
+                projects.save(second, document, registry(TEMPLATES))
+            self.assertEqual(path.read_text(), original)

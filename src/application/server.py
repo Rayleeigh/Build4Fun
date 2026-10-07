@@ -64,13 +64,17 @@ def make_handler(workspace, definitions, runtime=None):
                     if not mutation:
                         self.respond(200, projects.listing())
                     elif data.get('action') == 'rename':
-                        self.respond(200, projects.rename(data['id'], data.get('name')))
+                        with runtime.lock:
+                            result = projects.rename(data['id'], data.get('name'))
+                        self.respond(200, result)
                     elif data.get('action') == 'delete':
                         with runtime.lock:
                             projects.delete(data['id'])
                         self.respond(200, {'deleted': True})
                     elif data.get('action', 'create') == 'create':
-                        self.respond(200, projects.create(data.get('name')))
+                        with runtime.lock:
+                            result = projects.create(data.get('name'))
+                        self.respond(200, result)
                     else:
                         raise Invalid('Unknown project action.')
                     return
@@ -82,9 +86,9 @@ def make_handler(workspace, definitions, runtime=None):
                     self.respond(200, runtime.execute(query.get('workspace', ['legacy'])[0], data.get('action'), data.get('project') if data.get('action') == 'validate' else None))
                 elif route.path == '/api/project':
                     if mutation:
-                        check_structure(data['project'], definitions)
-                        atomic_write(project_path, yaml.safe_dump(data['project'], sort_keys=False))
-                        self.respond(200, {'saved': True})
+                        with runtime.lock:
+                            result = projects.save(query.get('workspace', ['legacy'])[0], data['project'], definitions)
+                        self.respond(200, result)
                     else:
                         project = read_yaml(project_path.read_text()) if project_path.exists() else {'id': 'root', 'type': 'harness', 'version': 1, 'values': {}, 'children': []}
                         check_structure(project, definitions)

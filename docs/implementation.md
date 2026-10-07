@@ -87,7 +87,8 @@ To keep the implementation maintainable, the editor, block registry, harness, an
 ## UX improvement roadmap
 
 We will improve the editor in small, tested steps. The workspace navigation now
-contains Build and Files, with YAML preview inside Build. The next steps are:
+contains collapsible Projects and Files sections. Opening a project enters its
+builder directly, with YAML preview alongside the blocks. The next steps are:
 
 1. A contextual block palette that shows valid additions for the selected service,
    group, or Compose harness. Apprentices can click to add or drag a block into a
@@ -106,7 +107,11 @@ contains Build and Files, with YAML preview inside Build. The next steps are:
    stop/removal. A deployment snapshot and ownership checks scope Docker actions
    to the workspace.
 5. Multiple projects, each with its own blocks, files, and Compose output.
-   Basic creation, switching, and isolated storage are now implemented.
+   Complete: each project owns its block tree, file workspace, drafts, undo
+   history, generated Compose output, and deployment snapshot. Saved Compose
+   names are unique across projects and cannot change while deployed. Saving an
+   incomplete project removes stale generated output without touching its last
+   deployed snapshot.
 
 Inline editing remains a planned builder improvement: common values should be
 editable directly in their blocks, with the inspector reserved for explanations

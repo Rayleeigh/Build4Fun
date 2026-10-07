@@ -86,6 +86,10 @@ def main():
                 assert explorer['x'] < builder['x'] < preview['x']
                 assert builder['width'] > preview['width']
                 expect(page.locator('.code-body')).to_contain_text('nginx:latest')
+                with page.expect_download() as download_event:
+                    page.get_by_role('button', name='Download compose.yaml', exact=True).click()
+                assert download_event.value.suggested_filename == 'homelab-compose.yaml'
+
                 page.get_by_role('button', name='Inspect Image', exact=True).click()
                 expect(page.locator('.code-line.highlight')).to_have_count(1)
                 page.screenshot(path=str(artifacts / 'split.png'), full_page=True, animations="disabled")
@@ -208,6 +212,7 @@ def main():
                 page.get_by_role('button', name='Save project', exact=True).click()
                 expect(page.locator('#save-status')).to_have_text('All changes saved')
                 assert workspace.read('nginx/nginx.conf') == 'not valid nginx syntax\nkeep this unchanged\n'
+                assert (workspace.root / 'compose.yaml').exists()
                 page.reload()
                 expect(page.locator('.service-card')).to_have_count(0)
                 page.locator('[data-project-id=legacy]').get_by_role('button', name='Open', exact=True).click()

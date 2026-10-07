@@ -124,3 +124,22 @@ class RuntimeTests(unittest.TestCase):
         with patch.object(self.runtime, 'run', side_effect=self.fake), self.assertRaisesRegex(Invalid, 'another managed deployment'):
             self.runtime.execute(self.project['id'], 'start')
         self.assertFalse((self.workspace.root / 'deployment.json').exists())
+
+    def test_two_deployments_use_separate_snapshots_and_control_arguments(self):
+        other = self.projects.create('Other')
+        other_workspace = self.projects.workspace(other['id'])
+        document = read_yaml((other_workspace.root / 'project.yaml').read_text())
+        document['children'].append(block('service', {'name': 'worker'}, block('image', {'image': 'nginx:alpine'})))
+        self.projects.save(other['id'], document, self.runtime.definitions)
+        with patch.object(self.runtime, 'run', side_effect=self.fake):
+            self.runtime.execute(self.project['id'], 'start')
+            self.runtime.execute(other['id'], 'start')
+            self.runtime.execute(self.project['id'], 'stop')
+            stop_args = self.calls[-1][0]
+            self.assertEqual(stop_args[stop_args.index('-p') + 1], 'test-runtime')
+            self.assertEqual(stop_args[stop_args.index('-f') + 1], str(self.workspace.root / 'compose.deployed.yaml'))
+            self.runtime.execute(self.project['id'], 'remove')
+        self.assertIsNotNone(self.runtime.manifest(other_workspace))
+        snapshot = read_yaml((other_workspace.root / 'compose.deployed.yaml').read_text())
+        self.assertEqual(snapshot['services']['worker']['image'], 'nginx:alpine')
+        self.assertNotEqual(self.runtime.owner(self.workspace), self.runtime.owner(other_workspace))

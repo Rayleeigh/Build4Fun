@@ -636,9 +636,10 @@ function renderEditor(content) {
 async function saveAll() {
   if(!state.activeProject||state.saving||state.deleting)return;state.saving=true;updateStatus();
   try{
-    if(state.dirty){const revision=state.revision;await api('/api/project',{project:state.project});if(state.revision===revision)state.dirty=false;}
+    let composeGenerated=true;
+    if(state.dirty){const revision=state.revision;const result=await api('/api/project',{project:state.project});composeGenerated=result.composeGenerated!==false;if(state.revision===revision)state.dirty=false;}
     for(const [path,draft] of state.drafts){if(!draft.dirty)continue;const revision=draft.revision;await api('/api/file',{path,content:draft.content});if(draft.revision===revision)draft.dirty=false;}
-    state.projects=await api('/api/projects');notify(dirty()?'Saved. Newer edits are still unsaved.':'All changes saved.');renderNavigation();if(state.view==='projects')renderMain();
+    state.projects=await api('/api/projects');notify(dirty()?'Saved. Newer edits are still unsaved.':composeGenerated?'All changes saved.':'Project saved. Fix the block errors to generate its Compose file.');renderNavigation();if(state.view==='projects')renderMain();
   }finally{state.saving=false;updateStatus();if(state.view==='projects')renderMain();}
 }
 function renderRuntime(content) {
@@ -702,7 +703,7 @@ function paintPreview(output) {
   });output.append(code);highlightCode();
 }
 function highlightCode(){const range=state.preview?.blocks?.[state.selected];document.querySelectorAll('.code-body').forEach(code=>[...code.children].forEach((row,index)=>row.classList.toggle('highlight',!!range&&index+1>=range.start&&index+1<=range.end)));}
-function downloadCompose(){if(!state.preview||state.previewRevision!==state.revision){notify('Generate a valid Compose preview before downloading.',true);return;}const url=URL.createObjectURL(new Blob([state.preview.yaml],{type:'application/yaml'})),link=el('a');link.href=url;link.download='compose.yaml';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+function downloadCompose(){if(!state.preview||state.previewRevision!==state.revision){notify('Generate a valid Compose preview before downloading.',true);return;}const url=URL.createObjectURL(new Blob([state.preview.yaml],{type:'application/yaml'})),link=el('a');link.href=url;link.download=`${projectName()}-compose.yaml`;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 async function validateProject() {
   const revision=state.revision;state.issues=collectIssues();
   if(!state.issues.length){
@@ -753,12 +754,13 @@ async function saveProjectFromOverview(identity) {
   const session=projectSessions.get(identity);if(!session)return;
   state.saving=true;updateStatus();renderMain();
   try {
-    if(session.dirty){await api('/api/project',{project:session.project},identity);session.dirty=false;}
+    let composeGenerated=true;
+    if(session.dirty){const result=await api('/api/project',{project:session.project},identity);composeGenerated=result.composeGenerated!==false;session.dirty=false;}
     for(const [path,draft] of session.drafts){
       if(!draft.dirty)continue;
       await api('/api/file',{path,content:draft.content},identity);draft.dirty=false;
     }
-    state.projects=await api('/api/projects');notify('Project saved.');
+    state.projects=await api('/api/projects');notify(composeGenerated?'Project saved.':'Project saved. Fix the block errors to generate its Compose file.');
   } finally {state.saving=false;updateStatus();renderMain();}
 }
 function renderProjects(content) {

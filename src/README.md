@@ -97,15 +97,25 @@ syntax are valid; Build4Fun uses short syntax for a more readable preview.
 
 The original workspace remains in `.workspace/project.yaml` and `.workspace/files/`.
 New projects live in `.workspace/projects/<stable-id>/`, each with its own
-`project.yaml`, `metadata.json`, and `files/` directory. Definitions
+`project.yaml`, `metadata.json`, and `files/` directory. Saving a valid project
+also writes its own `compose.yaml`; incomplete projects keep their saved blocks
+but have no generated file. Stale output is removed when blocks become invalid. Definitions
 are loaded on startup; restart the server after adding or editing one. The
 browser receives definitions from the backend and generates its controls from
 that metadata. Group blocks collect entries; they do not add extra Compose keys.
 
 Bind-mount paths in an exported Compose file are relative to the directory
 containing that file. To run an export manually, place it in the workspace's
-`files/` directory alongside the referenced project files. The prototype does
-not connect to Docker or start containers.
+`files/` directory alongside the referenced project files. Downloads use the name
+`<compose-project-name>-compose.yaml` to distinguish projects. The saved
+`compose.yaml` in the project's root uses `./files/…` bind paths instead, so it
+can be used in place. The deployed snapshot is separate and contains resolved
+host paths and ownership labels; incomplete edits never replace that snapshot.
+
+Compose names must be unique across saved projects. Rename in the overview changes
+only the display name. To change a deployed Compose name, remove the deployment
+first. Switching, saving, renaming, deleting, stopping, or removing one project
+leaves other projects' files and deployments intact.
 
 ## Checks
 
