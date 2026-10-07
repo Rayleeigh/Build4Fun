@@ -11,6 +11,7 @@ from core import Invalid, registry, check_structure, compose_preview, read_yaml
 from storage import Workspace, atomic_write
 from projects import Projects
 from docker_runtime import DockerRuntime
+from revisions import Revisions, Conflict, fingerprint
 
 BASE = Path(__file__).resolve().parent
 
@@ -18,6 +19,7 @@ BASE = Path(__file__).resolve().parent
 def make_handler(workspace, definitions, runtime=None):
     projects = Projects(workspace)
     runtime = runtime or DockerRuntime(projects, definitions, os.environ.get('B4F_DOCKER', 'docker'), os.environ.get('B4F_HOST_WORKSPACE'))
+    revisions = Revisions(projects, definitions)
     class Handler(BaseHTTPRequestHandler):
         def respond(self, status, data, content_type='application/json'):
             body = json.dumps(data).encode() if content_type == 'application/json' else data
@@ -53,7 +55,7 @@ def make_handler(workspace, definitions, runtime=None):
                     if self.headers.get('Content-Type') != 'application/json':
                         raise Invalid('Expected a JSON request.')
                     size = int(self.headers.get('Content-Length', '0'))
-                    if size < 1 or size > 2 * 1024 * 1024:
+                    if size < 1 or size > 16 * 1024 * 1024:
                         raise Invalid('Invalid request size.')
                     data = json.loads(self.rfile.read(size))
                     if not isinstance(data, dict):
@@ -79,15 +81,31 @@ def make_handler(workspace, definitions, runtime=None):
                         raise Invalid('Unknown project action.')
                     return
                 current_workspace = projects.workspace(query.get('workspace', ['legacy'])[0])
-                project_path = current_workspace.root / 'project.yaml'
+                project_path = current_workspace.project_path
+                identity = query.get('workspace', ['legacy'])[0]
                 if route.path == '/api/definitions' and not mutation:
                     self.respond(200, definitions)
+                elif route.path == '/api/snapshot' and not mutation:
+                    with runtime.lock:
+                        self.respond(200, revisions.read(identity))
+                elif route.path == '/api/revisions' and not mutation:
+                    with runtime.lock:
+                        self.respond(200, revisions.history(identity))
+                elif route.path == '/api/restore' and mutation:
+                    with runtime.lock:
+                        self.respond(200, revisions.restore(identity, data.get('expectedRevision'), data['revision']))
+                elif route.path == '/api/save' and mutation:
+                    with runtime.lock:
+                        self.respond(200, revisions.commit(identity, data.get('expectedRevision'), data['project'], data.get('files')))
                 elif route.path == '/api/docker' and mutation:
-                    self.respond(200, runtime.execute(query.get('workspace', ['legacy'])[0], data.get('action'), data.get('project') if data.get('action') == 'validate' else None))
+                    with runtime.lock:
+                        if data.get('action') in ('validate', 'start') and data.get('expectedRevision') != fingerprint(current_workspace):
+                            raise Conflict()
+                        self.respond(200, runtime.execute(identity, data.get('action')))
                 elif route.path == '/api/project':
                     if mutation:
                         with runtime.lock:
-                            result = projects.save(query.get('workspace', ['legacy'])[0], data['project'], definitions)
+                            result = revisions.commit(identity, data.get('expectedRevision'), data['project'])
                         self.respond(200, result)
                     else:
                         project = read_yaml(project_path.read_text()) if project_path.exists() else {'id': 'root', 'type': 'harness', 'version': 1, 'values': {}, 'children': []}
@@ -98,17 +116,18 @@ def make_handler(workspace, definitions, runtime=None):
                 elif route.path == '/api/files' and not mutation:
                     self.respond(200, current_workspace.listing())
                 elif route.path == '/api/file':
-                    if mutation:
-                        current_workspace.write(data['path'], data['content'], data.get('create', False))
-                        self.respond(200, {'saved': True})
-                    else:
-                        self.respond(200, {'content': current_workspace.read(query['path'][0])})
-                elif route.path == '/api/delete' and mutation:
-                    current_workspace.delete(data['path'])
-                    self.respond(200, {'deleted': True})
-                elif route.path == '/api/folder' and mutation:
-                    current_workspace.path(data['path']).mkdir(parents=True, exist_ok=False)
-                    self.respond(200, {'created': True})
+                    with runtime.lock:
+                        if mutation:
+                            operation = {'kind': 'create', 'path': data['path'], 'content': data['content']} if data.get('create') else None
+                            self.respond(200, revisions.commit(identity, data.get('expectedRevision'), edits=None if operation else {data['path']: data['content']}, operation=operation))
+                        else:
+                            if query.get('revision', [None])[0] != fingerprint(current_workspace):
+                                raise Conflict()
+                            self.respond(200, {'content': current_workspace.read(query['path'][0])})
+                elif route.path in ('/api/delete', '/api/folder', '/api/rename') and mutation:
+                    kind = {'/api/delete': 'delete', '/api/folder': 'folder', '/api/rename': 'rename'}[route.path]
+                    with runtime.lock:
+                        self.respond(200, revisions.commit(identity, data.get('expectedRevision'), project=data.get('project'), edits=data.get('files'), operation={**data, 'kind': kind}))
                 elif not mutation and route.path in ('/', '/app.js', '/style.css'):
                     filename = {'/': 'index.html', '/app.js': 'app.js', '/style.css': 'style.css'}[route.path]
                     kind = {'/': 'text/html; charset=utf-8', '/app.js': 'text/javascript; charset=utf-8', '/style.css': 'text/css; charset=utf-8'}[route.path]
@@ -116,7 +135,7 @@ def make_handler(workspace, definitions, runtime=None):
                 else:
                     self.respond(404, {'error': 'Not found.'})
             except (Invalid, ValueError, KeyError, TypeError, OSError, RecursionError) as error:
-                self.respond(400, {'error': str(error)})
+                self.respond(409 if isinstance(error, Conflict) else 400, {'error': str(error), 'issue': getattr(error, 'issue', {'code': 'request_failed', 'blockId': None, 'field': None, 'message': str(error)})})
     return Handler
 
 

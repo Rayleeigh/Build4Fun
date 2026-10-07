@@ -26,7 +26,7 @@ class Projects:
 
     def listing(self):
         result = []
-        project = self.legacy.root / 'project.yaml'
+        project = self.legacy.project_path
         if project.exists():
             data = read_yaml(project.read_text())
             name = next((n['values'].get('name') for n in data.get('children', []) if n['type'] == 'project-name'), None)
@@ -48,7 +48,7 @@ class Projects:
         slug = re.sub(r'[^a-z0-9_-]+', '-', name.lower()).strip('-_') or 'project'
         used = set()
         for item in existing:
-            document = self.workspace(item['id']).root / 'project.yaml'
+            document = self.workspace(item['id']).project_path
             if document.exists():
                 used.update(n['values'].get('name') for n in read_yaml(document.read_text()).get('children', []) if n['type'] == 'project-name')
         base, suffix = slug, 2
@@ -67,7 +67,7 @@ class Projects:
         atomic_write(workspace.root / 'metadata.json', json.dumps(metadata))
         return metadata
 
-    def save(self, identity, project, definitions):
+    def save(self, identity, project, definitions, target=None):
         workspace = self.workspace(identity)
         check_structure(project, definitions)
         name = next((node['values'].get('name') for node in project['children'] if node['type'] == 'project-name'), None)
@@ -78,7 +78,7 @@ class Projects:
             for item in self.listing():
                 if item['id'] == identity:
                     continue
-                other = self.workspace(item['id']).root / 'project.yaml'
+                other = self.workspace(item['id']).project_path
                 if other.exists() and any(node['values'].get('name') == name for node in read_yaml(other.read_text()).get('children', []) if node['type'] == 'project-name'):
                     raise Invalid(f'Compose project name {name} is already assigned to another project.')
         # Incomplete projects can be saved, but must never retain stale generated output.
@@ -93,8 +93,9 @@ class Projects:
             output = yaml.safe_dump(document, sort_keys=False)
         except Invalid as error:
             reason = str(error)
-        atomic_write(workspace.root / 'project.yaml', yaml.safe_dump(project, sort_keys=False))
-        generated = workspace.root / 'compose.yaml'
+        destination = target or workspace
+        atomic_write(destination.project_path, yaml.safe_dump(project, sort_keys=False))
+        generated = destination.data_root / 'compose.yaml'
         if output is None:
             generated.unlink(missing_ok=True)
         else:
@@ -119,6 +120,9 @@ class Projects:
         if (workspace.root / 'deployment.json').exists():
             raise Invalid('Remove this project’s deployment from Environment controls before deleting its files.')
         if identity == 'legacy':
+            if (workspace.root / 'revisions').exists():
+                shutil.rmtree(workspace.root / 'revisions')
+            (workspace.root / 'CURRENT').unlink(missing_ok=True)
             # The legacy root also contains all newer projects; never remove it.
             if workspace.files.is_symlink():
                 raise Invalid('Symbolic links are not supported in the workspace.')

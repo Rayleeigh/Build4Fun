@@ -3,7 +3,7 @@
 const $ = id => document.getElementById(id);
 const state = {
   filesExpanded: true, projectsExpanded: true, projects: [], activeProject: null, switching: false, definitions: {}, project: null, files: [], view: 'projects', pane: null, selected: null,
-  runtimeBusy: false, runtimeOutput: '', runtimeServices: [], previewVisible: true, revision: 0, dirty: false, saving: false, deleting: false, history: [], drafts: new Map(), file: '',
+  serverRevision: null, conflict: false, dockerValidatedRevision: null, runtimeBusy: false, runtimeOutput: '', runtimeServices: [], previewVisible: true, revision: 0, dirty: false, saving: false, deleting: false, history: [], drafts: new Map(), file: '',
   collapsed: new Set(), folders: new Set(), touched: new Set(), issues: [], validated: null,
   arriving: new Set(), preview: null, previewRevision: -1, previewError: '', drag: null, ready: false
 };
@@ -67,7 +67,7 @@ function makeBlock(type) { const d = state.definitions[type]; return {id: crypto
 function snapshot() { state.history.push(JSON.stringify(state.project)); if (state.history.length > 40) state.history.shift(); }
 function dirty() { return state.dirty || [...state.drafts.values()].some(d => d.dirty); }
 function changed() {
-  state.dirty = true; state.revision++; state.validated = null; state.issues = [];
+  state.dirty = true; state.revision++; state.validated = null; state.issues = []; state.dockerValidatedRevision=null;
   updateStatus(); renderValidation(); renderHeading(); schedulePreview();
 }
 function transact(action) { snapshot(); action(); changed(); render(); }
@@ -78,9 +78,11 @@ function notify(text, error = false) {
 }
 async function api(path, data, workspace=state.activeProject) {
   const endpoint=path.startsWith('/api/')&&!path.startsWith('/api/projects')&&path!=='/api/definitions'?path+(path.includes('?')?'&':'?')+'workspace='+encodeURIComponent(workspace):path;
-  const response = await fetch(endpoint, data === undefined ? {} : {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+  const session=workspace===state.activeProject?state:projectSessions.get(workspace);
+  if(data!==undefined&&session)data={...data,expectedRevision:session.serverRevision};
+  const response = await fetch(endpoint+(data===undefined&&path.startsWith('/api/file?')?'&revision='+encodeURIComponent(session?.serverRevision||''):''), data === undefined ? {} : {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
   if(response.status===404&&(path==='/api/delete'||path==='/api/docker'||path.startsWith('/api/projects')))throw new Error('The running Build4Fun server is outdated. Restart the Python server to load the latest changes, then refresh this page.');
-  const result = await response.json(); if (!response.ok) throw new Error(result.error || 'Request failed.'); return result;
+  const result = await response.json(); if (!response.ok){if(response.status===409&&session){session.conflict=true;renderHeading();}const error=new Error(result.error||'Request failed.');error.issue=result.issue;throw error;}if(result.revision&&session){session.serverRevision=result.revision;session.dockerValidatedRevision=null;}return result;
 }
 function guarded(fn) { return async event => { try { await fn(event); } catch (error) { notify(error.message,true); } }; }
 function updateStatus() {
@@ -626,23 +628,30 @@ function renderEditor(content) {
   const body=el('div',undefined,'editor-body'),numbers=el('pre',undefined,'editor-lines');numbers.setAttribute('aria-hidden','true');
   const editor=el('textarea');editor.value=draft.content;editor.spellcheck=false;editor.wrap='off';editor.setAttribute('aria-label',`Edit ${state.file}`);
   const lineNumbers=()=>{numbers.textContent=Array.from({length:editor.value.split('\n').length},(_,i)=>i+1).join('\n');};lineNumbers();
-  editor.addEventListener('input',()=>{draft.content=editor.value;draft.dirty=true;draft.revision++;lineNumbers();updateStatus();renderNavigation();});
+  editor.addEventListener('input',()=>{draft.content=editor.value;draft.dirty=true;draft.revision++;state.dockerValidatedRevision=null;lineNumbers();updateStatus();renderNavigation();});
   const remember=()=>{draft.caret=editor.selectionStart;draft.scroll=editor.scrollTop;numbers.scrollTop=editor.scrollTop;};
   ['keyup','click','scroll','blur'].forEach(event=>editor.addEventListener(event,remember));
   editor.addEventListener('keydown',event=>{if(event.key==='Tab'){event.preventDefault();const start=editor.selectionStart,end=editor.selectionEnd;editor.setRangeText('  ',start,end,'end');editor.dispatchEvent(new Event('input'));}});
   body.append(numbers,editor);shell.append(header,body,el('p','Configuration contents are yours to research and troubleshoot. Files are not validated.','code-hint'));content.append(shell);
   editor.setSelectionRange(draft.caret,draft.caret);editor.scrollTop=draft.scroll;numbers.scrollTop=draft.scroll;
 }
+async function saveSession(identity, session) {
+  const model=JSON.stringify(session.project), sent=[...session.drafts].filter(([,draft])=>draft.dirty).map(([path,draft])=>[path,draft.content,draft.revision]);
+  const result=await api('/api/save',{project:JSON.parse(model),files:Object.fromEntries(sent.map(([path,content])=>[path,content]))},identity);
+  if(JSON.stringify(session.project)===model){session.project=result.project;session.dirty=false;}
+  for(const [path,,revision] of sent){const draft=session.drafts.get(path);if(draft&&draft.revision===revision)draft.dirty=false;}
+  session.files=result.files;session.conflict=false;
+  return result;
+}
 async function saveAll() {
   if(!state.activeProject||state.saving||state.deleting)return;state.saving=true;updateStatus();
   try{
-    let composeGenerated=true;
-    if(state.dirty){const revision=state.revision;const result=await api('/api/project',{project:state.project});composeGenerated=result.composeGenerated!==false;if(state.revision===revision)state.dirty=false;}
-    for(const [path,draft] of state.drafts){if(!draft.dirty)continue;const revision=draft.revision;await api('/api/file',{path,content:draft.content});if(draft.revision===revision)draft.dirty=false;}
-    state.projects=await api('/api/projects');notify(dirty()?'Saved. Newer edits are still unsaved.':composeGenerated?'All changes saved.':'Project saved. Fix the block errors to generate its Compose file.');renderNavigation();if(state.view==='projects')renderMain();
+    const result=await saveSession(state.activeProject,state);
+    state.projects=await api('/api/projects');notify(dirty()?'Saved. Newer edits are still unsaved.':result.composeGenerated?'All changes saved.':'Project saved. Fix the block errors to generate its Compose file.');renderNavigation();
   }finally{state.saving=false;updateStatus();if(state.view==='projects')renderMain();}
 }
 function renderRuntime(content) {
+  content.append(el('p',state.dockerValidatedRevision===state.serverRevision&&!dirty()?'Docker validation matches this saved revision.':'This revision has not passed Docker validation.','save-status'));
   content.append(el('p','Start saves this project and its edited files before applying the configuration. Stop preserves containers and data. Logs are shown as reported by the services.','runtime-intro'));
   const actions=el('div',undefined,'runtime-actions');
   for(const [action,label] of [['validate','Check with Docker'],['start','Start / Apply'],['stop','Stop'],['status','Refresh status'],['logs','View logs']]){
@@ -659,10 +668,11 @@ function renderRuntime(content) {
 }
 async function runDocker(action) {
   if(state.runtimeBusy||state.saving||state.deleting)return;
-  if(action==='start')await saveAll();
+  if(action==='start'||action==='validate'){await saveAll();if(dirty())throw new Error('New edits arrived while saving. Save them before checking or starting.');}
   state.runtimeBusy=true;state.runtimeServices=[];renderMain();
   try {
-    const result=await api('/api/docker',{action,...(action==='validate'?{project:state.project}:{})});
+    const result=await api('/api/docker',{action});
+    if(action==='validate'||action==='start')state.dockerValidatedRevision=state.serverRevision;
     state.runtimeServices=result.services||[];
     state.runtimeOutput=result.output||result.message||(result.deployed?'No containers found for this deployment.':'This project has not been deployed.');
     if(action==='status'&&result.services?.length)state.runtimeOutput='Status refreshed from Docker.';
@@ -708,7 +718,7 @@ async function validateProject() {
   const revision=state.revision;state.issues=collectIssues();
   if(!state.issues.length){
     try{const result=await api('/api/preview',{project:state.project});if(state.revision!==revision)return;state.preview=result;state.previewRevision=revision;state.previewError='';}
-    catch(error){if(state.revision!==revision)return;const id=error.message.match(/\[([^\]]+)\]/)?.[1];const serviceName=error.message.match(/^Service ([^:]+):/)?.[1];const service=state.project.children.find(n=>n.type==='service'&&n.values.name===serviceName);state.issues=[{id:id||service?.id||state.project.id,message:error.message}];}
+    catch(error){if(state.revision!==revision)return;state.issues=[{id:error.issue?.blockId||state.project.id,key:error.issue?.field,message:error.message}];}
   }
   state.validated=!state.issues.length;render();
   if(state.validated)notify('Block and assembly checks passed. Use Check with Docker in Environment for Docker Compose validation.');
@@ -729,7 +739,7 @@ document.addEventListener('keydown',event=>{
   if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='z'&&!event.target.closest('input,textarea,select')&&!$('form-dialog').open){event.preventDefault();undo();}
   if(event.key==='Escape'&&!$('form-dialog').open&&!$('menu-dialog').open&&state.pane==='inspector'){state.pane=null;renderDetail();}
 });
-const sessionKeys=['project','files','view','pane','selected','dirty','history','drafts','file','filesExpanded','collapsed','folders','touched','issues','validated','arriving'];
+const sessionKeys=['serverRevision','conflict','dockerValidatedRevision','project','files','view','pane','selected','dirty','history','drafts','file','filesExpanded','collapsed','folders','touched','issues','validated','arriving'];
 async function switchProject(identity) {
   if(identity===state.activeProject||state.switching)return;
   if(state.saving||state.deleting||state.runtimeBusy)throw new Error('Wait for the current file operation to finish.');
@@ -739,8 +749,8 @@ async function switchProject(identity) {
     if(!session){
       // Explicit URLs keep these reads bound to their destination project.
       const read=async path=>{const response=await fetch(path+'?workspace='+encodeURIComponent(identity));const result=await response.json();if(!response.ok)throw new Error(result.error);return result;};
-      const [project,files]=await Promise.all([read('/api/project'),read('/api/files')]);
-      session={project,files,view:'build',pane:null,selected:null,dirty:false,history:[],drafts:new Map(),file:'',filesExpanded:true,collapsed:new Set(nodes(project).filter(node=>definition(node).op==='group').map(node=>node.id)),folders:new Set(),touched:new Set(),issues:[],validated:null,arriving:new Set()};
+      const {project,files,revision}=await read('/api/snapshot');
+      session={serverRevision:revision,conflict:false,dockerValidatedRevision:null,project,files,view:'build',pane:null,selected:null,dirty:false,history:[],drafts:new Map(),file:'',filesExpanded:true,collapsed:new Set(nodes(project).filter(node=>definition(node).op==='group').map(node=>node.id)),folders:new Set(),touched:new Set(),issues:[],validated:null,arriving:new Set()};
     }
     if(state.activeProject)projectSessions.set(state.activeProject,Object.fromEntries(sessionKeys.map(key=>[key,state[key]])));
     Object.assign(state,session);state.activeProject=identity;state.view='build';state.pane=null;
@@ -753,15 +763,8 @@ async function saveProjectFromOverview(identity) {
   if(identity===state.activeProject){await saveAll();return;}
   const session=projectSessions.get(identity);if(!session)return;
   state.saving=true;updateStatus();renderMain();
-  try {
-    let composeGenerated=true;
-    if(session.dirty){const result=await api('/api/project',{project:session.project},identity);composeGenerated=result.composeGenerated!==false;session.dirty=false;}
-    for(const [path,draft] of session.drafts){
-      if(!draft.dirty)continue;
-      await api('/api/file',{path,content:draft.content},identity);draft.dirty=false;
-    }
-    state.projects=await api('/api/projects');notify(composeGenerated?'Project saved.':'Project saved. Fix the block errors to generate its Compose file.');
-  } finally {state.saving=false;updateStatus();renderMain();}
+  try {await saveSession(identity,session);state.projects=await api('/api/projects');notify('Project saved.');}
+  finally {state.saving=false;updateStatus();renderMain();}
 }
 function renderProjects(content) {
   const welcome=el('div',undefined,'landing-intro');

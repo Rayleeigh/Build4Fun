@@ -3,6 +3,7 @@ from pathlib import Path
 import os
 import shutil
 import tempfile
+import re
 
 from core import Invalid
 
@@ -10,8 +11,28 @@ from core import Invalid
 class Workspace:
     def __init__(self, root):
         self.root = Path(root).resolve()
-        self.files = self.root / 'files'
         self.files.mkdir(parents=True, exist_ok=True)
+
+    @property
+    def data_root(self):
+        pointer = self.root / 'CURRENT'
+        if not pointer.exists():
+            return self.root
+        revision = pointer.read_text().strip()
+        if not re.fullmatch(r'[0-9a-f]{32}', revision):
+            raise Invalid('Invalid saved revision pointer.')
+        path = self.root / 'revisions' / revision
+        if path.is_symlink() or not path.is_dir():
+            raise Invalid('Saved revision is missing.')
+        return path
+
+    @property
+    def files(self):
+        return self.data_root / 'files'
+
+    @property
+    def project_path(self):
+        return self.data_root / 'project.yaml'
 
     def path(self, name):
         if not isinstance(name, str) or not name or '\x00' in name:
@@ -69,6 +90,8 @@ def atomic_write(path, content):
     try:
         with os.fdopen(descriptor, 'w', encoding='utf-8') as stream:
             stream.write(content)
+            stream.flush()
+            os.fsync(stream.fileno())
         os.replace(temporary, path)
     finally:
         if os.path.exists(temporary):

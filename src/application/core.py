@@ -7,7 +7,9 @@ import yaml
 
 
 class Invalid(ValueError):
-    pass
+    def __init__(self, message, code='invalid_configuration', block_id=None, field=None):
+        super().__init__(message)
+        self.issue = {'code': code, 'blockId': block_id, 'field': field, 'message': message}
 
 
 class UniqueLoader(yaml.SafeLoader):
@@ -122,9 +124,11 @@ def compile_project(project, definitions):
     def assemble(node):
         d = definitions[node['type']]
         values = {}
+        current_field = None
         def fail(message):
-            raise Invalid(f'{d["label"]} [{node["id"]}]: {message}')
+            raise Invalid(message, block_id=node['id'], field=current_field)
         for f in d.get('inputs', []):
+            current_field = f['key']
             value = node.get('values', {}).get(f['key'], '')
             if f.get('optional') and value in ('', None):
                 values[f['key']] = missing
@@ -174,6 +178,7 @@ def compile_project(project, definitions):
         result = render(d.get('template', {}))
         if result is missing:
             result = {}
+        current_field = None
         for child in node.get('children', []):
             cd = definitions[child['type']]
             item = assemble(child)
@@ -202,7 +207,7 @@ def compile_project(project, definitions):
         raise Invalid('Add a Project name block and at least one Service.')
     for kind, name, block_id in references:
         if name not in result.get(kind, {}):
-            raise Invalid(f'Block [{block_id}]: unknown {kind} reference: {name}')
+            raise Invalid(f'unknown {kind} reference: {name}', code='missing_reference', block_id=block_id)
     for name, service in result['services'].items():
         if not service.get('image'):
             raise Invalid(f'Service {name}: add an Image block.')
