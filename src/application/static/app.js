@@ -66,7 +66,20 @@ function allowed(parent, moving) { return (definition(parent).children || []).fi
 function makeBlock(type) { const d = state.definitions[type]; return {id: crypto.randomUUID(),type,version:d.version,values:Object.fromEntries((d.inputs || []).map(f => [f.key,f.type === 'boolean' ? false : ''])),children:[]}; }
 function snapshot() { state.history.push(JSON.stringify(state.project)); if (state.history.length > 40) state.history.shift(); }
 function dirty() { return state.dirty || [...state.drafts.values()].some(d => d.dirty); }
+function rememberReference(node,field) {
+  node.references ||= {};delete node.references[field.key];
+  if(field.reference){const matches=state.project.children.filter(item=>definition(item).target===field.reference&&item.values.name===node.values[field.key]);if(matches.length===1)node.references[field.key]=matches[0].id;}
+  if(field.file){const path=String(node.values[field.key]||'').replace(/^\.\//,'');const entry=Object.entries(state.project.fileReferences||{}).find(([,value])=>value===path);if(entry)node.references[field.key]=entry[0];}
+}
+function syncReferences() {
+  for(const node of nodes())for(const field of definition(node).inputs||[]){
+    const identity=node.references?.[field.key];
+    if(field.reference&&identity){const target=find(identity);if(target)node.values[field.key]=target.values.name;}
+    if(field.file&&identity&&state.project.fileReferences?.[identity])node.values[field.key]=state.project.fileReferences[identity];
+  }
+}
 function changed() {
+  syncReferences();
   state.dirty = true; state.revision++; state.validated = null; state.issues = []; state.dockerValidatedRevision=null;
   updateStatus(); renderValidation(); renderHeading(); schedulePreview();
 }
@@ -82,7 +95,7 @@ async function api(path, data, workspace=state.activeProject) {
   if(data!==undefined&&session)data={...data,expectedRevision:session.serverRevision};
   const response = await fetch(endpoint+(data===undefined&&path.startsWith('/api/file?')?'&revision='+encodeURIComponent(session?.serverRevision||''):''), data === undefined ? {} : {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
   if(response.status===404&&(path==='/api/delete'||path==='/api/docker'||path.startsWith('/api/projects')))throw new Error('The running Build4Fun server is outdated. Restart the Python server to load the latest changes, then refresh this page.');
-  const result = await response.json(); if (!response.ok){if(response.status===409&&session){session.conflict=true;renderHeading();}const error=new Error(result.error||'Request failed.');error.issue=result.issue;throw error;}if(result.revision&&session){session.serverRevision=result.revision;session.dockerValidatedRevision=null;}return result;
+  const result = await response.json(); if (!response.ok){if(response.status===409&&session){session.conflict=true;renderHeading();}const error=new Error(result.error||'Request failed.');error.issue=result.issue;throw error;}if(result.revision&&session){session.serverRevision=result.revision;session.dockerValidatedRevision=null;if(result.project&&['/api/file','/api/folder','/api/delete'].includes(path))session.project.fileReferences=result.project.fileReferences;}return result;
 }
 function guarded(fn) { return async event => { try { await fn(event); } catch (error) { notify(error.message,true); } }; }
 function updateStatus() {
@@ -224,7 +237,7 @@ function selectNode(node,inspect=true) {
   state.selected=node.id;
   if(inspect){state.pane='inspector';renderDetail();}
   syncSelection(); highlightCode(); renderNavigation();
-  if(inspect)requestAnimationFrame(()=>($('inspector-pane').querySelector('input,select')||$('inspector-pane').querySelector('button'))?.focus({preventScroll:true}));
+  if(inspect)($('inspector-pane').querySelector('input,select')||$('inspector-pane').querySelector('button'))?.focus({preventScroll:true});
 }
 function syncSelection() { document.querySelectorAll('[data-node-id]').forEach(e=>e.classList.toggle('is-selected',e.dataset.nodeId===state.selected)); }
 function nodeMenu(anchor,node) {
@@ -333,6 +346,7 @@ function renderFields(holder,node,{draft=false}={}) {
     input.addEventListener('input',()=>{
       if(!draft&&!editing){snapshot();editing=true;}
       node.values[field.key]=field.type==='boolean'?input.checked:input.value;
+      if(field.reference||field.file)rememberReference(node,field);
       if(!draft){changed();renderMain();renderNavigation();syncSelection();}
       if(state.touched.has(id))check();
     });
@@ -341,7 +355,7 @@ function renderFields(holder,node,{draft=false}={}) {
     if(field.file){
       const chooser=el('select');chooser.setAttribute('aria-label','Select project file or folder');chooser.append(new Option('Select from project…',''));
       state.files.forEach(f=>chooser.append(new Option(f.path+(f.directory?'/':''),f.path)));
-      chooser.addEventListener('change',()=>{if(!chooser.value)return;if(!draft)snapshot();node.values[field.key]=chooser.value;input.value=chooser.value;if(!draft){changed();renderMain();}check();});wrapper.append(chooser);
+      chooser.addEventListener('change',()=>{if(!chooser.value)return;if(!draft)snapshot();node.values[field.key]=chooser.value;rememberReference(node,field);input.value=chooser.value;if(!draft){changed();renderMain();}check();});wrapper.append(chooser);
       if(!draft)wrapper.append(button('Open file',guarded(()=>openFile(node.values[field.key])),'tertiary','file'));
     }
     if(field.reference&&!references(field.reference).length)wrapper.append(el('p','Declare this resource at project level first.','field-hint'));
@@ -477,6 +491,7 @@ function renderNavigation() {
 function renderHeading() {
   const titles={runtime:['PROJECT','Environment'],projects:['WORKSPACE','Projects'],build:['WORKSPACE','Build environment'],compose:['WORKSPACE','Build environment'],files:['PROJECT','Project files'],file:['PROJECT FILE',state.file.split('/').pop()]};
   $('page-eyebrow').textContent=titles[state.view][0];$('page-title').textContent=titles[state.view][1];const actions=$('page-actions');actions.replaceChildren();
+  if(state.activeProject&&state.view!=='projects')actions.append(button(state.conflict?'Resolve save conflict':'Saved versions',guarded(savedVersions),'secondary'));
   if(state.view==='build'||state.view==='compose'){
     if(state.validated===true){const badge=el('span',undefined,'validation-badge');badge.append(icon('check'),el('span','Checked'));actions.append(badge);}
     if(state.activeProject==='legacy'&&!state.project.children.length&&!state.dirty)actions.append(button('Open saved project',guarded(openSavedProject),'secondary','folder'));
@@ -570,8 +585,24 @@ function fileActions(anchor,entry) {
     {label:'New file',icon:'file',action:()=>createFile(false,entry.path)},
     {label:'New folder',icon:'folder',action:()=>createFile(true,entry.path)}
   ]:[{label:'Open',icon:'file',action:guarded(()=>openFile(entry.path))}];
+  items.push({label:'Rename',icon:'edit',disabled:state.saving||state.deleting,action:()=>renameFile(entry)});
   items.push({label:'Delete',icon:'trash',destructive:true,disabled:state.saving||state.deleting,action:()=>deleteFile(entry)});
   openMenu(anchor,entry.name,items);
+}
+function renameFile(entry) {
+  let input;
+  openForm('Rename '+(entry.directory?'folder':'file'),'Enter the new project-relative path. This saves your project and drafts together, and updates bind-mount references.',holder=>{
+    const label=el('label','New path');input=el('input');input.id='rename-path';label.htmlFor=input.id;input.value=entry.path;holder.append(label,input);
+  },'Rename',async()=>{
+    if(state.saving||state.deleting)throw new Error('Wait for the current save to finish.');
+    state.saving=true;updateStatus();
+    try{
+      const destination=input.value.trim(),result=await api('/api/rename',{path:entry.path,destination,project:state.project,files:Object.fromEntries([...state.drafts].filter(([,draft])=>draft.dirty).map(([path,draft])=>[path,draft.content]))});
+      const renamed=path=>path===entry.path||path.startsWith(entry.path+'/')?destination+path.slice(entry.path.length):path;
+      state.drafts=new Map([...state.drafts].map(([path,draft])=>[renamed(path),{...draft,dirty:false}]));state.file=renamed(state.file);state.folders=new Set([...state.folders].map(renamed));
+      state.project=result.project;state.files=result.files;state.dirty=false;state.history=[];state.revision++;state.previewRevision=-1;render();notify('Renamed. Mount references updated.');
+    }finally{state.saving=false;updateStatus();}
+  });
 }
 function deleteFile(entry) {
   if(state.saving||state.deleting){notify('Wait for the current file operation to finish.',true);return;}
@@ -583,7 +614,7 @@ function deleteFile(entry) {
     return source&&(inside(source)||entry.path.startsWith(source+'/'));
   });
   openForm(`Delete ${entry.directory?'folder':'file'}?`,
-    `“${entry.path}”${entry.directory?' and all of its contents':''} will be permanently deleted. This cannot be undone.`,holder=>{
+    `“${entry.path}”${entry.directory?' and all of its contents':''} will be removed from the current project. Earlier saved versions remain available for recovery.`,holder=>{
       if(unsaved)holder.append(el('p',`${unsaved} file${unsaved===1?' has':'s have'} unsaved changes that will be discarded.`,'field-hint'));
       if(affected.length)holder.append(el('p',`${affected.length} bind mount${affected.length===1?' references':'s reference'} this path or its contents. Those blocks will remain and must be updated manually.`,'field-hint'));
     },'Delete permanently',async()=>{
@@ -635,6 +666,26 @@ function renderEditor(content) {
   body.append(numbers,editor);shell.append(header,body,el('p','Configuration contents are yours to research and troubleshoot. Files are not validated.','code-hint'));content.append(shell);
   editor.setSelectionRange(draft.caret,draft.caret);editor.scrollTop=draft.scroll;numbers.scrollTop=draft.scroll;
 }
+function downloadData(data, filename, type='application/json') {
+  const url=URL.createObjectURL(new Blob([data],{type})),link=el('a');link.href=url;link.download=filename;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+function applySavedSnapshot(result) {
+  state.project=result.project;state.files=result.files;state.serverRevision=result.revision;
+  state.drafts=new Map();state.dirty=false;state.conflict=false;state.history=[];state.file='';state.selected=null;state.pane=null;state.view='build';
+  state.validated=null;state.dockerValidatedRevision=null;state.issues=[];state.revision++;state.previewRevision=-1;render();
+}
+async function savedVersions() {
+  const revisions=await api('/api/revisions');let select;
+  openForm('Saved versions','Reload the latest saved version or restore an earlier one. This replaces your local blocks and file drafts. Download a draft backup first if you want to keep them.',holder=>{
+    holder.append(button('Download draft backup',()=>downloadData(JSON.stringify({project:state.project,files:Object.fromEntries([...state.drafts].map(([path,draft])=>[path,draft.content]))},null,2),'build4fun-drafts.json'),'secondary'));
+    select=el('select');select.setAttribute('aria-label','Saved version');
+    const latest=el('option','Latest saved version');latest.value='';select.append(latest);
+    revisions.forEach((revision,index)=>{const option=el('option',`Saved version ${revisions.length-index} · ${revision.slice(0,8)}`);option.value=revision;select.append(option);});holder.append(select);
+  },'Replace local drafts',async()=>{
+    const result=select.value?await api('/api/restore',{revision:select.value}):await api('/api/snapshot');
+    applySavedSnapshot(result);notify('Saved version loaded.');
+  });
+}
 async function saveSession(identity, session) {
   const model=JSON.stringify(session.project), sent=[...session.drafts].filter(([,draft])=>draft.dirty).map(([path,draft])=>[path,draft.content,draft.revision]);
   const result=await api('/api/save',{project:JSON.parse(model),files:Object.fromEntries(sent.map(([path,content])=>[path,content]))},identity);
@@ -654,6 +705,7 @@ function renderRuntime(content) {
   content.append(el('p',state.dockerValidatedRevision===state.serverRevision&&!dirty()?'Docker validation matches this saved revision.':'This revision has not passed Docker validation.','save-status'));
   content.append(el('p','Start saves this project and its edited files before applying the configuration. Stop preserves containers and data. Logs are shown as reported by the services.','runtime-intro'));
   const actions=el('div',undefined,'runtime-actions');
+  for(const issue of state.issues){const node=find(issue.id);if(node)actions.append(button('Show affected block',()=>{navigate('build');revealNode(node);selectNode(node);},'secondary'));}
   for(const [action,label] of [['validate','Check with Docker'],['start','Start / Apply'],['stop','Stop'],['status','Refresh status'],['logs','View logs']]){
     const control=button(label,guarded(()=>runDocker(action)),action==='start'?'primary':'secondary');control.disabled=state.runtimeBusy;actions.append(control);
   }
@@ -676,13 +728,13 @@ async function runDocker(action) {
     state.runtimeServices=result.services||[];
     state.runtimeOutput=result.output||result.message||(result.deployed?'No containers found for this deployment.':'This project has not been deployed.');
     if(action==='status'&&result.services?.length)state.runtimeOutput='Status refreshed from Docker.';
-  }catch(error){state.runtimeOutput=error.message;}
+  }catch(error){state.runtimeOutput=error.message;if(error.issue?.blockId)state.issues=[{id:error.issue.blockId,key:error.issue.field,message:error.message}];}
   finally{state.runtimeBusy=false;if(state.view==='runtime')renderMain();}
 }
 /* Compose is generated on the server. Its source map links lines back to blocks. */
 function composePane(compact) {
   const shell=el('div',undefined,'code-shell');const header=el('div',undefined,'pane-header'),title=el('div');title.append(icon('code'),el('strong','compose.yaml'));
-  const actions=el('div');actions.append(iconButton('download','Download compose.yaml',()=>downloadCompose()));
+  const actions=el('div');actions.append(iconButton('download','Download compose.yaml',()=>downloadCompose()),button('Export project',guarded(exportProject),'tertiary'));
   if(compact)actions.append(iconButton('code','Open full Compose preview',()=>navigate('compose')));header.append(title,actions);
   const output=el('div',undefined,'preview-output');shell.append(header,output,el('p','Select a YAML line to find its block. Generated output is read-only.','code-hint'));
   paintPreview(output);return shell;
@@ -713,6 +765,12 @@ function paintPreview(output) {
   });output.append(code);highlightCode();
 }
 function highlightCode(){const range=state.preview?.blocks?.[state.selected];document.querySelectorAll('.code-body').forEach(code=>[...code.children].forEach((row,index)=>row.classList.toggle('highlight',!!range&&index+1>=range.start&&index+1<=range.end)));}
+async function exportProject() {
+  await saveAll();if(dirty())throw new Error('Save your latest edits before exporting.');
+  const response=await fetch('/api/export?workspace='+encodeURIComponent(state.activeProject)+'&revision='+encodeURIComponent(state.serverRevision));
+  if(!response.ok){const result=await response.json();throw new Error(result.error);}
+  downloadData(await response.blob(),projectName()+'-project.zip','application/zip');
+}
 function downloadCompose(){if(!state.preview||state.previewRevision!==state.revision){notify('Generate a valid Compose preview before downloading.',true);return;}const url=URL.createObjectURL(new Blob([state.preview.yaml],{type:'application/yaml'})),link=el('a');link.href=url;link.download=`${projectName()}-compose.yaml`;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 async function validateProject() {
   const revision=state.revision;state.issues=collectIssues();

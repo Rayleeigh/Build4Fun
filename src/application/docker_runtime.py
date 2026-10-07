@@ -9,7 +9,9 @@ import uuid
 
 import yaml
 from core import Invalid, compose_yaml, read_yaml
-from storage import atomic_write
+from storage import Workspace, atomic_write
+from revisions import copy_files, fingerprint
+from references import normalize, walk
 
 OWNER = 'io.build4fun.workspace'
 
@@ -55,7 +57,8 @@ class DockerRuntime:
             atomic_write(path, uuid.uuid4().hex)
         return path.read_text().strip()
 
-    def prepare(self, workspace, project):
+    def prepare(self, workspace, project, inputs=None):
+        project = normalize(project, self.definitions, strict=True)
         document = read_yaml(compose_yaml(project, self.definitions))
         owner = self.owner(workspace)
         for service in document['services'].values():
@@ -64,9 +67,14 @@ class DockerRuntime:
                 if mount['type'] != 'bind':
                     continue
                 # Values were escaped for Compose interpolation; filesystem paths are literal.
-                path = workspace.path(mount['source'].replace('$$', '$'))
-                if not path.exists():
-                    raise Invalid(f'Bind mount source does not exist: {mount["source"]}')
+                source = mount['source'].replace('$$', '$')
+                origin = next((node for node in walk(project) if node['type'] == 'bind-mount' and str(Path(node['values'].get('source', ''))) == str(Path(source))), None)
+                try:
+                    path = (inputs or workspace).path(source)
+                    if not path.exists():
+                        raise Invalid(f'Bind mount source does not exist: {source}')
+                except Invalid as error:
+                    raise Invalid(str(error), code='invalid_mount', block_id=origin['id'] if origin else None, field='source') from error
                 if self.host_workspace:
                     path = self.host_workspace / path.relative_to(self.projects.legacy.root)
                 elif Path('/.dockerenv').exists():
@@ -100,6 +108,36 @@ class DockerRuntime:
                 if (details.get('Labels') or {}).get(OWNER) != owner:
                     raise Invalid(f'Docker {kind} {resource_name} already exists outside this workspace.')
 
+    def check_ports(self, workspace, document, endpoint):
+        requested = []
+        for service in document['services'].values():
+            for value in service.get('ports', []):
+                mapping, _, protocol = value.partition('/')
+                host, published, _ = mapping.rsplit(':', 2) if mapping.count(':') > 1 else ('', *mapping.split(':'))
+                requested.append((host.strip('[]'), str(published), protocol or 'tcp'))
+        if not requested:
+            return
+        identities = self.run(['ps', '-q'], workspace.root, endpoint=endpoint).split()
+        for identity in identities:
+            details = json.loads(self.run(['inspect', identity], workspace.root, endpoint=endpoint))[0]
+            labels = details.get('Config', {}).get('Labels') or {}
+            if labels.get(OWNER) == self.owner(workspace):
+                continue
+            occupied = []
+            for target, bindings in details.get('NetworkSettings', {}).get('Ports', {}).items():
+                for binding in bindings or []:
+                    occupied.append((binding['HostIp'], binding['HostPort'], target.rsplit('/', 1)[-1]))
+            # Desktop may publish ports through its host proxy rather than Engine NAT.
+            for key, value in labels.items():
+                if key.startswith('desktop.docker.io/ports/') and ':' in value:
+                    host, port = value.rsplit(':', 1)
+                    occupied.append((host.strip('[]'), port, key.rsplit('/', 1)[-1]))
+            for host, port, protocol in requested:
+                for other_host, other_port, other_protocol in occupied:
+                    overlap = host == other_host or host in ('', '0.0.0.0', '::') or other_host in ('', '0.0.0.0', '::')
+                    if port == other_port and protocol == other_protocol and overlap:
+                        raise Invalid(f'Host port {port}/{protocol} is already published by another container.', code='port_conflict')
+
     def execute(self, identity, action, project=None):
         if not self.lock.acquire(blocking=False):
             raise Invalid('Another Docker operation is in progress. Try again shortly.')
@@ -116,11 +154,18 @@ class DockerRuntime:
         atomic_write(workspace.root / 'compose.empty.env', '')
         if action in ('validate', 'start'):
             if project is None:
-                path = workspace.root / 'project.yaml'
+                path = workspace.project_path
                 if not path.exists():
                     raise Invalid('Save the project before starting it.')
                 project = read_yaml(path.read_text())
+            saved_revision = fingerprint(workspace)
+            # Check original sources before copying, including forbidden symlinks.
             document = self.prepare(workspace, project)
+            inputs = None
+            if action == 'start':
+                inputs = Workspace(workspace.root / 'deployment-inputs' / uuid.uuid4().hex)
+                copy_files(workspace, inputs)
+                document = self.prepare(workspace, project, inputs)
             name = document['name']
             if deployment and deployment['name'] != name:
                 raise Invalid('Remove the existing deployment before changing its Compose project name.')
@@ -138,10 +183,11 @@ class DockerRuntime:
                 if other and other['name'] == name and other['endpoint'] == endpoint:
                     raise Invalid('This Compose project name is assigned to another managed deployment.')
             self.check_ownership(workspace, document, endpoint)
+            self.check_ports(workspace, document, endpoint)
             deployed = workspace.root / 'compose.deployed.yaml'
             atomic_write(deployed, candidate.read_text())
             # Persist before up: failed/partial starts must remain manageable.
-            atomic_write(workspace.root / 'deployment.json', json.dumps({'name': name, 'endpoint': endpoint}))
+            atomic_write(workspace.root / 'deployment.json', json.dumps({'name': name, 'endpoint': endpoint, 'revision': saved_revision, 'inputs': str(inputs.root)}))
             output = self.compose(workspace, deployed, name, ['up', '-d', '--remove-orphans'], endpoint, 180)
             return {'message': 'Start command completed. Refresh status to check service health.', 'output': output}
         if not deployment:

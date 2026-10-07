@@ -7,6 +7,7 @@ from pathlib import Path
 
 from core import Invalid, read_yaml
 from storage import Workspace, atomic_write
+from references import normalize
 
 
 class Conflict(Invalid):
@@ -43,7 +44,7 @@ class Revisions:
     def read(self, identity):
         workspace = self.projects.workspace(identity)
         project = read_yaml(workspace.project_path.read_text())
-        return {'project': project, 'files': workspace.listing(), 'revision': fingerprint(workspace)}
+        return {'project': normalize(project, self.definitions, workspace.listing()), 'files': workspace.listing(), 'revision': fingerprint(workspace)}
 
     def commit(self, identity, expected, project=None, edits=None, operation=None):
         workspace = self.projects.workspace(identity)
@@ -60,10 +61,12 @@ class Revisions:
             atomic_write(baseline / 'project.yaml', workspace.project_path.read_text())
         revision = uuid.uuid4().hex
         stage = Workspace(root / revision)
+        committed = False
         try:
             copy_files(workspace, stage)
             atomic_write(stage.project_path, workspace.project_path.read_text())
             model = project if project is not None else read_yaml(stage.project_path.read_text())
+            model = normalize(model, self.definitions, stage.listing())
             for path, content in (edits or {}).items():
                 stage.write(path, content)
             if operation:
@@ -81,6 +84,9 @@ class Revisions:
                         raise Invalid('Choose a new, unused destination outside the folder being moved.')
                     destination.parent.mkdir(parents=True, exist_ok=True)
                     source.rename(destination)
+                    for file_id, value in model.get('fileReferences', {}).items():
+                        if value == path or value.startswith(path + '/'):
+                            model['fileReferences'][file_id] = operation['destination'] + value[len(path):]
                     def update(node):
                         if node['type'] == 'bind-mount':
                             value = node['values'].get('source', '').removeprefix('./')
@@ -91,16 +97,19 @@ class Revisions:
                     update(model)
                 else:
                     raise Invalid('Unknown file operation.')
+            model = normalize(model, self.definitions, stage.listing())
             result = self.projects.save(identity, model, self.definitions, target=stage)
             atomic_write(stage.root / 'revision.json', json.dumps({'parent': base.name if base.parent == root else None}))
             # Detect out-of-process modifications during staging too.
             if fingerprint(workspace) != expected:
                 raise Conflict()
             atomic_write(workspace.root / 'CURRENT', revision)
+            committed = True
             result.update(self.read(identity))
             return result
         except Exception:
-            shutil.rmtree(stage.root)
+            if not committed:
+                shutil.rmtree(stage.root)
             raise
 
     def history(self, identity):
@@ -117,14 +126,15 @@ class Revisions:
             raise Conflict()
         # Make recovery a new commit; never rewrite the historical revision.
         current = workspace.root / 'CURRENT'
-        old = current.read_text() if current.exists() else None
-        # commit supports only overlay edits: restoring uses a complete file operation below.
         model = read_yaml(source.project_path.read_text())
         target_id = uuid.uuid4().hex
         stage = Workspace(workspace.root / 'revisions' / target_id)
         try:
             copy_files(source, stage)
             self.projects.save(identity, model, self.definitions, target=stage)
+            atomic_write(stage.root / 'revision.json', json.dumps({'restoredFrom': revision}))
+            if fingerprint(workspace) != expected:
+                raise Conflict()
             atomic_write(current, target_id)
         except Exception:
             shutil.rmtree(stage.root)

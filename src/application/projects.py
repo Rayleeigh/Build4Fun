@@ -120,6 +120,8 @@ class Projects:
         if (workspace.root / 'deployment.json').exists():
             raise Invalid('Remove this project’s deployment from Environment controls before deleting its files.')
         if identity == 'legacy':
+            if (workspace.root / 'deployment-inputs').exists():
+                shutil.rmtree(workspace.root / 'deployment-inputs')
             if (workspace.root / 'revisions').exists():
                 shutil.rmtree(workspace.root / 'revisions')
             (workspace.root / 'CURRENT').unlink(missing_ok=True)

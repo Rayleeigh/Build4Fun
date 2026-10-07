@@ -14,7 +14,7 @@ python3 -m venv .venv
 .venv/bin/python src/application/server.py
 ```
 
-Open http://127.0.0.1:8080. The server binds to loopback only. Use `--port` or
+Open http://127.0.0.1:8080. The server binds to loopback by default. Use `--port` or
 `--workspace` to change the port or storage directory.
 
 ## Use the workspace
@@ -44,7 +44,7 @@ No default project is created; existing saved work remains available.
 3. Click a configuration row to edit it in the inspector. Expand a group to see
    individual entries. **Project networks** defines networks created by Compose;
    **Shared resources** offers named volumes and existing external networks.
-4. Workspace navigation contains **Build** and **Files**. The builder shows the
+4. Opening a project takes you directly into its builder. **Files** expands the explorer. The builder shows the
    file explorer on the left, the composing area in the center, and live Compose
    YAML on the right. **Hide YAML / Show YAML** controls the desktop preview;
    on phones, **YAML / Blocks** switches the Build view. Select a block to highlight
@@ -95,22 +95,33 @@ syntax are valid; Build4Fun uses short syntax for a more readable preview.
 - `templates/`: one YAML definition per generic Compose block.
 - `tests/`: unit tests, browser regression checks, and isolated example fixtures.
 
-The original workspace remains in `.workspace/project.yaml` and `.workspace/files/`.
-New projects live in `.workspace/projects/<stable-id>/`, each with its own
-`project.yaml`, `metadata.json`, and `files/` directory. Saving a valid project
-also writes its own `compose.yaml`; incomplete projects keep their saved blocks
-but have no generated file. Stale output is removed when blocks become invalid. Definitions
-are loaded on startup; restart the server after adding or editing one. The
-browser receives definitions from the backend and generates its controls from
-that metadata. Group blocks collect entries; they do not add extra Compose keys.
+The original workspace is read from `.workspace/project.yaml` and `.workspace/files/`.
+New projects live in `.workspace/projects/<stable-id>/`. On saving, blocks and file
+edits are staged together under `revisions/<revision-id>/`; an atomic `CURRENT`
+pointer selects the saved revision. A failed save leaves the previous revision
+selected. A stale browser tab receives a conflict instead of overwriting newer work.
+**Saved versions** lets you reload or restore a revision. Download a draft backup
+before replacing local edits if needed. That JSON backup is for manual recovery;
+there is no automatic draft-import command yet. History currently has no automatic
+retention limit, so workspace backups and disk usage should include `revisions/`.
 
-Bind-mount paths in an exported Compose file are relative to the directory
-containing that file. To run an export manually, place it in the workspace's
-`files/` directory alongside the referenced project files. Downloads use the name
-`<compose-project-name>-compose.yaml` to distinguish projects. The saved
-`compose.yaml` in the project's root uses `./files/…` bind paths instead, so it
-can be used in place. The deployed snapshot is separate and contains resolved
-host paths and ownership labels; incomplete edits never replace that snapshot.
+Definitions load on startup; restart the server after changing one. Existing
+name-based resource references migrate to block IDs when unambiguous. Renaming a
+resource keeps its attachments connected. File/folder paths have persistent IDs
+in the saved project; **Rename** in the explorer saves drafts and updates mount
+references together. Direct filesystem renames are not tracked automatically.
+
+**Download compose.yaml** downloads only the preview; put it alongside its
+referenced files to run manually. **Export project** saves and downloads a ZIP
+containing `compose.yaml`, `files/`, the block project, and a short start guide.
+Extract the entire ZIP before running Compose. Images, external networks, and
+Docker volume contents are not included.
+
+Deployment uses a separate copy under `deployment-inputs/`. Subsequent editor
+saves do not alter mounted deployment files. Writable bind mounts write into that
+deployment copy; applying another revision creates a fresh copy from saved files.
+Use named volumes for data that must persist across Apply. Deployment input copies
+are retained with the project and are removed when that project is deleted.
 
 Compose names must be unique across saved projects. Rename in the overview changes
 only the display name. To change a deployed Compose name, remove the deployment
@@ -151,9 +162,9 @@ inserted into new projects.
 This is an initial local prototype, not the complete implementation document.
 It supports multiple isolated projects, nested block placement by click or drag, plain-text
 editing with line numbers, application-level validation, and Docker Compose execution. Free-form canvas
-positioning, service-file syntax highlighting, file renaming, stable file-reference tracking,
-definition migrations, and container packaging remain to be implemented. Resource references currently use
-names: renaming a declared resource requires updating its attachments.
+positioning, service-file syntax highlighting, and general definition-version migrations remain
+to be implemented. This application is intended for one trusted local server process
+per workspace, not shared multiuser hosting.
 
 A successful preview means the application's assembly checks passed. It does
 not mean Docker Compose or the target services have validated the result.
@@ -182,7 +193,7 @@ save drafts before refreshing or closing the application.
 Install Docker with the Compose plugin and start the local Docker Engine. In an
 open project, choose **Environment**:
 
-- **Check with Docker** checks the current blocks using `docker compose config`.
+- **Check with Docker** saves blocks and file drafts together, then checks that revision using `docker compose config`.
 - **Start / Apply** saves the active project and its file drafts, validates its
   generated configuration, then runs `docker compose up -d --remove-orphans`.
   Image downloads can take time; errors are shown in the output area.
@@ -227,3 +238,36 @@ Browser tests use a simulated Engine for lifecycle actions.
 **Files** now expands its project-specific explorer in place. Use the adjacent +
 to create files and folders. Each project retains its own drafts, folder expansion
 state, and explorer visibility while switching. Click a file to edit it.
+
+## Container installation
+
+The image includes Python, the Docker CLI, and the Compose plugin. It uses the
+[official Docker CLI image](https://github.com/docker-library/docker/tree/master/29/cli)
+as a build stage. The application talks to the host Engine; it does not run a nested Engine.
+
+```sh
+mkdir -p "$PWD/.workspace"
+export B4F_HOST_WORKSPACE="$PWD/.workspace"
+# Docker Desktop users: set this if /var/run/docker.sock is not available.
+# export B4F_DOCKER_SOCKET="$HOME/.docker/run/docker.sock"
+docker compose up --build -d
+```
+
+Open http://127.0.0.1:8080. The supplied Compose file publishes only to localhost.
+`B4F_HOST_WORKSPACE` must be the absolute host directory mounted at `/workspace`.
+The socket grants control over the Docker host, so use this in the trusted local
+learning environment described in the implementation document. Stop the app with
+`docker compose stop`; this preserves its workspace and apprentice deployments.
+
+## Full lifecycle regression
+
+```sh
+.venv/bin/python src/tests/docker_integration.py --run
+```
+
+This opt-in test pulls `nginx:alpine` if needed and creates a uniquely named test
+project. It checks saved/reopened data, validation, HTTP access, status, logs,
+stop/apply, named-volume persistence, missing images, and occupied ports. Its
+containers, network, temporary files, and test volume are cleaned up afterward.
+The image cache remains available. It never opens your application workspace.
+The GitHub Actions workflow runs unit, browser, and real lifecycle checks.

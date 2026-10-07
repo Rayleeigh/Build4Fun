@@ -12,6 +12,7 @@ from storage import Workspace, atomic_write
 from projects import Projects
 from docker_runtime import DockerRuntime
 from revisions import Revisions, Conflict, fingerprint
+from export import project_bundle
 
 BASE = Path(__file__).resolve().parent
 
@@ -88,6 +89,11 @@ def make_handler(workspace, definitions, runtime=None):
                 elif route.path == '/api/snapshot' and not mutation:
                     with runtime.lock:
                         self.respond(200, revisions.read(identity))
+                elif route.path == '/api/export' and not mutation:
+                    with runtime.lock:
+                        if query.get('revision', [None])[0] != fingerprint(current_workspace):
+                            raise Conflict()
+                        self.respond(200, project_bundle(current_workspace), 'application/zip')
                 elif route.path == '/api/revisions' and not mutation:
                     with runtime.lock:
                         self.respond(200, revisions.history(identity))
@@ -142,10 +148,11 @@ def make_handler(workspace, definitions, runtime=None):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--port', type=int, default=8080)
+    parser.add_argument('--bind', default='127.0.0.1', choices=['127.0.0.1', '0.0.0.0'])
     parser.add_argument('--workspace', default=str(BASE.parents[1] / '.workspace'))
     args = parser.parse_args()
     definitions = registry(BASE.parent / 'templates')
-    server = ThreadingHTTPServer(('127.0.0.1', args.port), make_handler(Workspace(args.workspace), definitions))
+    server = ThreadingHTTPServer((args.bind, args.port), make_handler(Workspace(args.workspace), definitions))
     print(f'Build4Fun: http://127.0.0.1:{args.port}', flush=True)
     try:
         server.serve_forever()

@@ -212,7 +212,39 @@ def main():
                 page.get_by_role('button', name='Save project', exact=True).click()
                 expect(page.locator('#save-status')).to_have_text('All changes saved')
                 assert workspace.read('nginx/nginx.conf') == 'not valid nginx syntax\nkeep this unchanged\n'
-                assert (workspace.root / 'compose.yaml').exists()
+                assert (workspace.data_root / 'compose.yaml').exists()
+                # Another tab saving must not silently overwrite this tab's drafts.
+                from revisions import Revisions
+                from projects import Projects
+                revisions = Revisions(Projects(workspace), registry(ROOT / 'templates'))
+                saved = revisions.read('legacy')
+                revisions.commit('legacy', saved['revision'], edits={'other-tab.conf': 'other tab'})
+                editor.fill('local draft retained')
+                page.get_by_role('button', name='Save project', exact=True).click()
+                expect(page.get_by_role('button', name='Resolve save conflict', exact=True)).to_be_visible()
+                expect(editor).to_have_value('local draft retained')
+                page.get_by_role('button', name='Resolve save conflict', exact=True).click()
+                with page.expect_download() as backup:
+                    page.get_by_role('button', name='Download draft backup', exact=True).click()
+                assert backup.value.suggested_filename == 'build4fun-drafts.json'
+                page.get_by_role('button', name='Replace local drafts', exact=True).click()
+                expect(page.get_by_role('button', name='Saved versions', exact=True)).to_be_visible()
+                expect(page.locator('#save-status')).to_have_text('All changes saved')
+                # Rename a folder and keep its file drafts and mount references together.
+                page.locator('#project-files').get_by_role('button', name='File actions for nginx', exact=True).click()
+                page.get_by_role('menuitem', name='Rename', exact=True).click()
+                page.get_by_label('New path', exact=True).fill('site-config')
+                page.locator('#form-dialog').get_by_role('button', name='Rename', exact=True).click()
+                expect(page.locator('#project-files').get_by_role('button', name='site-config', exact=True)).to_be_visible()
+                assert workspace.read('site-config/nginx.conf').startswith('not valid nginx')
+                page.locator('#project-files').get_by_role('button', name='File actions for site-config', exact=True).click()
+                page.get_by_role('menuitem', name='Rename', exact=True).click()
+                page.get_by_label('New path', exact=True).fill('nginx')
+                page.locator('#form-dialog').get_by_role('button', name='Rename', exact=True).click()
+                expect(page.locator('#project-files').get_by_role('button', name='nginx', exact=True)).to_be_visible()
+                with page.expect_download() as bundle:
+                    page.get_by_role('button', name='Export project', exact=True).click()
+                assert bundle.value.suggested_filename.endswith('-project.zip')
                 page.reload()
                 expect(page.locator('.service-card')).to_have_count(0)
                 page.locator('[data-project-id=legacy]').get_by_role('button', name='Open', exact=True).click()
@@ -278,7 +310,7 @@ def main():
                 expect(page.locator('.code-body')).to_contain_text('redis:alpine')
                 page.screenshot(path=str(artifacts / 'mobile.png'), full_page=True, animations="disabled")
                 # First-run landing creates no default project or service.
-                (workspace.root / 'project.yaml').unlink()
+                __import__('projects').Projects(workspace).delete('legacy')
                 page.set_viewport_size({'width': 1440, 'height': 1050})
                 page.emulate_media(color_scheme='light')
                 page.reload()

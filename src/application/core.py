@@ -4,6 +4,7 @@ import copy
 import ipaddress
 import re
 import yaml
+from references import normalize
 
 
 class Invalid(ValueError):
@@ -118,6 +119,7 @@ def check_structure(project, definitions):
 
 def compile_project(project, definitions):
     check_structure(project, definitions)
+    project = normalize(project, definitions, strict=True)
     references = []
     missing = object()
 
@@ -225,7 +227,7 @@ def compile_project(project, definitions):
                 if source.is_absolute() or '..' in source.parts or not source.parts:
                     raise Invalid(f'Service {name}: bind source must be a project-relative path.')
                 mount['source'] = './' + source.as_posix()
-    validate_networks(result)
+    validate_networks(result, project)
     for name, service in result['services'].items():
         result['services'][name] = ordered(service, ('image', 'build', 'command', 'restart', 'ports', 'environment', 'volumes', 'networks'))
     for section in ('services', 'networks', 'volumes', 'configs', 'secrets'):
@@ -247,18 +249,27 @@ def short_port(port):
     return f'{prefix}{port["published"]}:{port["target"]}{protocol}'
 
 
-def validate_networks(config):
+def validate_networks(config, project=None):
+    from references import walk
+    children = (project or {}).get('children', [])
+    resources = {node['values'].get('name'): node for node in children if node['type'] in ('network', 'external-network')}
+    services = {node['values'].get('name'): node for node in children if node['type'] == 'service'}
+    def network_error(message, name, field):
+        raise Invalid(message, code='invalid_network', block_id=resources.get(name, {}).get('id'), field=field)
+    def address_error(message, service, network):
+        node = next((node for node in walk(services.get(service, {})) if node.get('type') == 'network-attachment' and node.get('values', {}).get('network') == network), {})
+        raise Invalid(message, code='invalid_address', block_id=node.get('id'), field='ipv4Address')
     subnets = {}
     for name, network in config.get('networks', {}).items():
         for entry in network.get('ipam', {}).get('config', []):
             if not entry.get('subnet'):
-                raise Invalid(f'Network {name}: a subnet is required when a gateway is set.')
+                network_error(f'Network {name}: a subnet is required when a gateway is set.', name, 'subnet')
             subnet = ipaddress.IPv4Network(entry['subnet'])
             subnets[name] = subnet
             if entry.get('gateway'):
                 address = ipaddress.IPv4Address(entry['gateway'])
                 if address not in subnet or address in (subnet.network_address, subnet.broadcast_address):
-                    raise Invalid(f'Network {name}: gateway must be a usable address inside the subnet.')
+                    network_error(f'Network {name}: gateway must be a usable address inside the subnet.', name, 'gateway')
     assigned = set()
     for name, service in config['services'].items():
         for network_name, attachment in service.get('networks', {}).items():
@@ -269,18 +280,18 @@ def validate_networks(config):
             address = ipaddress.IPv4Address(value)
             identity = (network.get('name', network_name), str(address))
             if identity in assigned:
-                raise Invalid(f'Service {name}: duplicate static IP {value} on network {network_name}.')
+                address_error(f'Service {name}: duplicate static IP {value} on network {network_name}.', name, network_name)
             assigned.add(identity)
             if network.get('external'):
                 continue  # Its subnet belongs to the existing Docker network.
             subnet = subnets.get(network_name)
             if not subnet:
-                raise Invalid(f'Service {name}: define a subnet for network {network_name} before assigning a static IP.')
+                address_error(f'Service {name}: define a subnet for network {network_name} before assigning a static IP.', name, network_name)
             if address not in subnet or address in (subnet.network_address, subnet.broadcast_address):
-                raise Invalid(f'Service {name}: static IP {value} must be a usable address inside {subnet}.')
+                address_error(f'Service {name}: static IP {value} must be a usable address inside {subnet}.', name, network_name)
             gateways = [e.get('gateway') for e in network.get('ipam', {}).get('config', [])]
             if value in gateways:
-                raise Invalid(f'Service {name}: static IP cannot equal the network gateway.')
+                address_error(f'Service {name}: static IP cannot equal the network gateway.', name, network_name)
 
 
 class QuotedPort(str):

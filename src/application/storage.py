@@ -16,6 +16,8 @@ class Workspace:
     @property
     def data_root(self):
         pointer = self.root / 'CURRENT'
+        if pointer.is_symlink() or (self.root / 'revisions').is_symlink():
+            raise Invalid('Saved revision paths must not be symbolic links.')
         if not pointer.exists():
             return self.root
         revision = pointer.read_text().strip()

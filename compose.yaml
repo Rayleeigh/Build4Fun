@@ -1,0 +1,20 @@
+name: build4fun
+services:
+  app:
+    build: .
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      DOCKER_HOST: unix:///var/run/docker.sock
+      B4F_HOST_WORKSPACE: ${B4F_HOST_WORKSPACE:?Set B4F_HOST_WORKSPACE to an absolute host directory}
+    volumes:
+      - type: bind
+        source: ${B4F_HOST_WORKSPACE}
+        target: /workspace
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${B4F_DOCKER_SOCKET:-/var/run/docker.sock}
+        target: /var/run/docker.sock
+        bind:
+          create_host_path: false
