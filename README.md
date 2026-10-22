@@ -9,6 +9,7 @@ the images, ports, paths, and settings themselves.
 
 ## Getting started
 
+### Install with docker compose
 Install Docker with the Compose plugin and start the Docker Engine. From the
 repository root:
 
@@ -26,6 +27,12 @@ learning environment.
 
 To apply application or template changes, rerun the Compose command above.
 Stop Build4Fun with `docker compose stop`; apprentice deployments remain running.
+
+### Install with docker pull
+
+```
+docker run --rm -p 127.0.0.1:8080:8080 ghcr.io/rayleeigh/build4fun:latest
+```
 
 ## Features
 
