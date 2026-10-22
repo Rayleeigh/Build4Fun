@@ -66,6 +66,36 @@ function allowed(parent, moving) { return (definition(parent).children || []).fi
 function makeBlock(type) { const d = state.definitions[type]; return {id: crypto.randomUUID(),type,version:d.version,values:Object.fromEntries((d.inputs || []).map(f => [f.key,f.type === 'boolean' ? false : ''])),children:[]}; }
 function snapshot() { state.history.push(JSON.stringify(state.project)); if (state.history.length > 40) state.history.shift(); }
 function dirty() { return state.dirty || [...state.drafts.values()].some(d => d.dirty); }
+function draftKey(session=state) { return 'build4fun-draft-v1:'+session.recoveryScope; }
+function persistDraft(session=state) {
+  if(!session.recoveryScope||session.recoveryPending)return;
+  try {
+    if(session.dirty||[...session.drafts.values()].some(d=>d.dirty)) {
+      localStorage.setItem(draftKey(session),JSON.stringify({version:1,base:session.serverRevision,project:session.project,
+        drafts:[...session.drafts].filter(([,d])=>d.dirty),savedAt:new Date().toISOString()}));
+    } else localStorage.removeItem(draftKey(session));
+  } catch(error) {
+    if(!session.recoveryWarning){session.recoveryWarning=true;notify('Browser draft recovery is unavailable or storage is full. Save your project to preserve edits.',true);}
+  }
+}
+function offerRecovery() {
+  if(!state.recoveryPending)return;
+  let saved;
+  try{saved=JSON.parse(localStorage.getItem(draftKey()));}catch(error){notify('The browser draft could not be read. Save or download your work before closing.',true);return;}
+  if(!saved){state.recoveryPending=false;return;}
+  const identity=state.activeProject;
+  openForm('Recover unsaved work?',saved.base===state.serverRevision?'A browser draft is available for this project.':'The saved project changed since this draft. Recovering keeps the draft for review; saving requires resolving the revision conflict.',holder=>{
+    holder.append(el('p','Draft saved '+saved.savedAt));
+    holder.append(button('Discard browser draft',()=>{localStorage.removeItem(draftKey());state.recoveryPending=false;$('form-dialog').close();},'secondary'));
+  },'Recover draft',()=>{
+    if(identity!==state.activeProject)throw new Error('Open the original project to recover its draft.');
+    if(saved.version!==1||!saved.project||!Array.isArray(saved.drafts))throw new Error('Unsupported browser draft.');
+    state.project=saved.project;state.drafts=new Map(saved.drafts);state.dirty=true;
+    state.conflict=saved.base!==state.serverRevision;state.serverRevision=saved.base;
+    state.recoveryPending=false;state.revision++;state.previewRevision=-1;render();notify('Unsaved work recovered. Review it before saving.');
+  });
+  $('form-dialog').addEventListener('close',()=>{if(identity===state.activeProject&&state.recoveryPending)navigate('projects');},{once:true});
+}
 function rememberReference(node,field) {
   node.references ||= {};delete node.references[field.key];
   if(field.reference){const matches=state.project.children.filter(item=>definition(item).target===field.reference&&item.values.name===node.values[field.key]);if(matches.length===1)node.references[field.key]=matches[0].id;}
@@ -95,10 +125,11 @@ async function api(path, data, workspace=state.activeProject) {
   if(data!==undefined&&session)data={...data,expectedRevision:session.serverRevision};
   const response = await fetch(endpoint+(data===undefined&&path.startsWith('/api/file?')?'&revision='+encodeURIComponent(session?.serverRevision||''):''), data === undefined ? {} : {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
   if(response.status===404&&(path==='/api/delete'||path==='/api/docker'||path.startsWith('/api/projects')))throw new Error('The running Build4Fun server is outdated. Restart the Python server to load the latest changes, then refresh this page.');
-  const result = await response.json(); if (!response.ok){if(response.status===409&&session){session.conflict=true;renderHeading();}const error=new Error(result.error||'Request failed.');error.issue=result.issue;throw error;}if(result.revision&&session){session.serverRevision=result.revision;session.dockerValidatedRevision=null;if(result.project&&['/api/file','/api/folder','/api/delete'].includes(path))session.project.fileReferences=result.project.fileReferences;}return result;
+  const result = await response.json(); if (!response.ok){if(response.status===409&&session){session.conflict=true;renderHeading();}const error=new Error(result.error||'Request failed.');error.issue=result.issue;throw error;}if(result.revision&&session&&path!=='/api/deployment-plan'){session.serverRevision=result.revision;session.dockerValidatedRevision=null;if(result.project&&['/api/file','/api/folder','/api/delete'].includes(path))session.project.fileReferences=result.project.fileReferences;}return result;
 }
 function guarded(fn) { return async event => { try { await fn(event); } catch (error) { notify(error.message,true); } }; }
 function updateStatus() {
+  persistDraft();
   const landing=state.view==='projects';
   document.querySelector('.toolbar-trailing').hidden=landing;
   document.querySelector('.statusbar').hidden=landing;
@@ -489,14 +520,16 @@ function renderNavigation() {
   updateStatus();
 }
 function renderHeading() {
-  const titles={runtime:['PROJECT','Environment'],projects:['WORKSPACE','Projects'],build:['WORKSPACE','Build environment'],compose:['WORKSPACE','Build environment'],files:['PROJECT','Project files'],file:['PROJECT FILE',state.file.split('/').pop()]};
+  const titles={map:['PROJECT','Network map'],runtime:['PROJECT','Environment'],projects:['WORKSPACE','Projects'],build:['WORKSPACE','Build environment'],compose:['WORKSPACE','Build environment'],files:['PROJECT','Project files'],file:['PROJECT FILE',state.file.split('/').pop()]};
   $('page-eyebrow').textContent=titles[state.view][0];$('page-title').textContent=titles[state.view][1];const actions=$('page-actions');actions.replaceChildren();
   if(state.activeProject&&state.view!=='projects')actions.append(button(state.conflict?'Resolve save conflict':'Saved versions',guarded(savedVersions),'secondary'));
   if(state.view==='build'||state.view==='compose'){
     if(state.validated===true){const badge=el('span',undefined,'validation-badge');badge.append(icon('check'),el('span','Checked'));actions.append(badge);}
     if(state.activeProject==='legacy'&&!state.project.children.length&&!state.dirty)actions.append(button('Open saved project',guarded(openSavedProject),'secondary','folder'));
     actions.append(button('Validate',guarded(validateProject),'secondary','check'));
+    actions.append(button('Network map',()=>navigate('map'),'secondary','network'));
     actions.append(button('Environment',()=>navigate('runtime'),'secondary','cube'));
+    const deploy=button('Deploy',guarded(reviewDeployment),'primary','cube');deploy.disabled=state.runtimeBusy||state.saving;actions.append(deploy);
     if(state.view==='build'){
       const toggle=button(state.previewVisible?'Hide YAML':'Show YAML',()=>{
         state.previewVisible=!state.previewVisible;renderHeading();renderDetail();
@@ -510,7 +543,8 @@ function renderHeading() {
 }
 function renderMain() {
   const content=$('content');content.replaceChildren();
-  if(state.view==='runtime')renderRuntime(content);
+  if(state.view==='map')renderNetworkMap(content);
+  else if(state.view==='runtime')renderRuntime(content);
   else if(state.view==='projects')renderProjects(content);
   else if(state.view==='build')renderBuilder(content);
   else if(state.view==='compose')content.append(composePane(false));
@@ -691,7 +725,7 @@ async function saveSession(identity, session) {
   const result=await api('/api/save',{project:JSON.parse(model),files:Object.fromEntries(sent.map(([path,content])=>[path,content]))},identity);
   if(JSON.stringify(session.project)===model){session.project=result.project;session.dirty=false;}
   for(const [path,,revision] of sent){const draft=session.drafts.get(path);if(draft&&draft.revision===revision)draft.dirty=false;}
-  session.files=result.files;session.conflict=false;
+  session.files=result.files;session.conflict=false;persistDraft(session);
   return result;
 }
 async function saveAll() {
@@ -701,13 +735,89 @@ async function saveAll() {
     state.projects=await api('/api/projects');notify(dirty()?'Saved. Newer edits are still unsaved.':result.composeGenerated?'All changes saved.':'Project saved. Fix the block errors to generate its Compose file.');renderNavigation();
   }finally{state.saving=false;updateStatus();if(state.view==='projects')renderMain();}
 }
+async function reviewDeployment() {
+  if(state.runtimeBusy||state.saving||state.deleting)return;
+  await saveAll();
+  if(dirty()||state.conflict)throw new Error('Save your changes and resolve conflicts before deploying.');
+  const identity=state.activeProject;
+  const revision=state.serverRevision;
+  const plan=await api('/api/deployment-plan');
+  if(plan.revision!==revision)throw new Error('The saved project changed. Reload it before reviewing deployment.');
+  if(identity!==state.activeProject)throw new Error('Project changed. Open Deploy again.');
+  openForm(plan.deployed?'Review deployment changes':'Deploy environment',
+    'Deploy runs this project on the local Docker Engine. Images may need to download. Removed services will be removed from the deployment.',holder=>{
+      const list=el('ul');for(const change of plan.changes)list.append(el('li',change));
+      holder.append(list,el('p',plan.changes.length?'Review these changes before continuing.':'No configuration or saved file changes since the last deployment.'));
+      holder.append(el('p','Apply creates a fresh copy of saved files for bind mounts. Changes written by containers into the previous copy are not carried forward. Named volumes keep their data.'));
+    },'Deploy now',async()=>{
+      if(identity!==state.activeProject||revision!==state.serverRevision||dirty())throw new Error('Project changed. Close this review and open Deploy again.');
+      navigate('runtime');await runDocker('start',true);
+    });
+}
+function renderTopology(content, services) {
+  const resources=new Map(),edges=[];
+  for(const service of services){
+    const all=nodes(service),attachments=all.filter(n=>n.type==='network-attachment');
+    for(const node of all.filter(n=>['network-attachment','volume-mount','bind-mount','port'].includes(n.type))){
+      const key=node.type==='network-attachment'?'network:'+node.values.network:node.type==='volume-mount'?'volume:'+node.values.source:node.type==='bind-mount'?'file:'+node.values.source:'port:'+node.id;
+      const label=node.type==='network-attachment'?'Network: '+(node.values.network||'?'):node.type==='volume-mount'?'Volume: '+(node.values.source||'?'):node.type==='bind-mount'?'Files: '+(node.values.source||'?'):'Host: '+summarize(node);
+      resources.set(key,{label,node});edges.push({service,node,key});
+    }
+    if(!attachments.length){resources.set('default',{label:'Network: default',node:null});edges.push({service,node:service,key:'default'});}
+  }
+  const ns='http://www.w3.org/2000/svg',height=Math.max(services.length,resources.size)*80+40;
+  const svg=document.createElementNS(ns,'svg');svg.setAttribute('viewBox',`0 0 900 ${height}`);svg.setAttribute('class','topology');svg.setAttribute('role','group');svg.setAttribute('aria-label','Service connections to networks, host ports and storage');
+  const make=(tag,attributes)=>{const node=document.createElementNS(ns,tag);for(const [key,value] of Object.entries(attributes))node.setAttribute(key,String(value));return node;};
+  const keys=[...resources.keys()];
+  for(const edge of edges){
+    const y1=60+services.indexOf(edge.service)*80,y2=60+keys.indexOf(edge.key)*80;
+    const path=make('path',{d:`M 270 ${y1} C 420 ${y1}, 480 ${y2}, 630 ${y2}`,fill:'none',stroke:'currentColor','stroke-width':2,opacity:0.4});
+    const title=make('title',{});title.textContent=nameOf(edge.service)+' → '+resources.get(edge.key).label;path.append(title);svg.append(path);
+  }
+  const box=(label,x,y,node)=>{
+    const group=make('g',node?{role:'button',tabindex:0,'aria-label':label}:{role:'img','aria-label':label});
+    group.append(make('rect',{x,y:y-22,width:250,height:44,rx:8,fill:'var(--surface, Canvas)',stroke:'currentColor'}));
+    const text=make('text',{x:x+12,y:y+5,fill:'currentColor','font-size':14});text.textContent=label.length>30?label.slice(0,29)+'…':label;group.append(text);
+    if(node){const select=()=>{navigate('build');revealNode(node);selectNode(node);};group.addEventListener('click',select);group.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();select();}});}
+    svg.append(group);
+  };
+  services.forEach((service,index)=>box(nameOf(service),20,60+index*80,service));
+  keys.forEach((key,index)=>{const resource=resources.get(key);box(resource.label,630,60+index*80,resource.node);});
+  const scroll=el('div',undefined,'topology-scroll');scroll.append(svg);content.append(scroll);
+}
+function renderNetworkMap(content) {
+  content.append(el('p','Select a service or connection to open its block. This map describes the current blocks, including unsaved edits.','runtime-intro'));
+  const services=state.project.children.filter(n=>n.type==='service');
+  if(!services.length){content.append(el('p','Add a service to see its connections.'));return;}
+  renderTopology(content,services);
+  const map=el('div',undefined,'network-map');
+  const link=(label,node,explanation)=>{
+    const row=button(label,()=>{navigate('build');revealNode(node);selectNode(node);},'secondary',blockIcon(node.type));
+    row.title=explanation;const item=el('div',undefined,'map-connection');item.append(row,el('p',explanation));return item;
+  };
+  for(const service of services){
+    const card=el('section',undefined,'map-service');card.append(button(nameOf(service),()=>{navigate('build');revealNode(service);selectNode(service);},'secondary','cube'));
+    const descendants=nodes(service);
+    const attachments=descendants.filter(n=>n.type==='network-attachment');
+    if(!attachments.length)card.append(el('p','↔ Default network · services using this network can reach each other by service name.'));
+    for(const node of attachments){const resource=state.project.children.find(n=>['network','external-network'].includes(n.type)&&n.values.name===node.values.network);
+      card.append(link('↔ '+summarize(node),node,resource?'Connects to '+nameOf(resource)+(resource.type==='external-network'?' (existing external network).':'. Services on this network can reach each other by service name.'):'References a network that has not been declared.'));
+    }
+    for(const node of descendants.filter(n=>n.type==='port'))card.append(link('Host → '+summarize(node),node,'Forwards traffic from the host port to the container port.'));
+    for(const node of descendants.filter(n=>['volume-mount','bind-mount'].includes(n.type)))card.append(link('Storage → '+summarize(node),node,node.type==='volume-mount'?'Named volume data persists across deployments.':'Project files are copied into a fresh deployment directory on Apply.'));
+    map.append(card);
+  }
+  content.append(map);
+  const resources=state.project.children.filter(n=>['network','external-network','named-volume'].includes(n.type));
+  if(resources.length){content.append(el('h2','Shared resources'));for(const node of resources)content.append(link(nameOf(node),node,summarize(node)));}
+}
 function renderRuntime(content) {
   content.append(el('p',state.dockerValidatedRevision===state.serverRevision&&!dirty()?'Docker validation matches this saved revision.':'This revision has not passed Docker validation.','save-status'));
   content.append(el('p','Start saves this project and its edited files before applying the configuration. Stop preserves containers and data. Logs are shown as reported by the services.','runtime-intro'));
   const actions=el('div',undefined,'runtime-actions');
   for(const issue of state.issues){const node=find(issue.id);if(node)actions.append(button('Show affected block',()=>{navigate('build');revealNode(node);selectNode(node);},'secondary'));}
   for(const [action,label] of [['validate','Check with Docker'],['start','Start / Apply'],['stop','Stop'],['status','Refresh status'],['logs','View logs']]){
-    const control=button(label,guarded(()=>runDocker(action)),action==='start'?'primary':'secondary');control.disabled=state.runtimeBusy;actions.append(control);
+    const control=button(label,guarded(()=>action==='start'?reviewDeployment():runDocker(action)),action==='start'?'primary':'secondary');control.disabled=state.runtimeBusy;actions.append(control);
   }
   const remove=button('Remove deployment',()=>openForm('Remove deployment?','Remove this project’s containers and Compose-managed networks. Named volumes, external networks, and project files will remain.',()=>{},'Remove deployment',()=>runDocker('remove')),'tertiary','trash');remove.disabled=state.runtimeBusy;actions.append(remove);content.append(actions);
   if(state.runtimeBusy)content.append(el('p','Working with Docker… Image downloads can take a few minutes.','save-status'));
@@ -718,9 +828,9 @@ function renderRuntime(content) {
   }
   const output=el('pre',state.runtimeOutput||'Choose an action to check Docker, view service status, or read logs.','runtime-output');output.setAttribute('aria-label','Docker output');output.setAttribute('role','status');content.append(output);
 }
-async function runDocker(action) {
+async function runDocker(action,reviewed=false) {
   if(state.runtimeBusy||state.saving||state.deleting)return;
-  if(action==='start'||action==='validate'){await saveAll();if(dirty())throw new Error('New edits arrived while saving. Save them before checking or starting.');}
+  if(!reviewed&&(action==='start'||action==='validate')){await saveAll();if(dirty())throw new Error('New edits arrived while saving. Save them before checking or starting.');}
   state.runtimeBusy=true;state.runtimeServices=[];renderMain();
   try {
     const result=await api('/api/docker',{action});
@@ -788,7 +898,7 @@ $('theme').append(icon('theme'));$('theme').onclick=event=>openMenu(event.curren
 setTheme(localStorage.getItem('build4fun-theme')||'system');matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{if((localStorage.getItem('build4fun-theme')||'system')==='system')setTheme('system');});
 $('toggle-sidebar').append(icon('sidebar'));$('toggle-sidebar').onclick=()=>{const app=$('app'),mobile=innerWidth<=720;app.classList.toggle(mobile?'mobile-nav':'nav-collapsed');$('toggle-sidebar').setAttribute('aria-expanded',mobile?app.classList.contains('mobile-nav'):!app.classList.contains('nav-collapsed'));};
 $('undo').append(icon('undo'));$('undo').onclick=undo;$('save').onclick=guarded(saveAll);
-window.addEventListener('beforeunload',event=>{if(dirty()||[...projectSessions].some(([id,s])=>id!==state.activeProject&&(s.dirty||[...s.drafts.values()].some(d=>d.dirty)))){event.preventDefault();event.returnValue='';}});
+window.addEventListener('beforeunload',event=>{persistDraft();if(dirty()||[...projectSessions].some(([id,s])=>id!==state.activeProject&&(s.dirty||[...s.drafts.values()].some(d=>d.dirty)))){event.preventDefault();event.returnValue='';}});
 document.addEventListener('dragstart',()=>{requestAnimationFrame(showDropTargets);});
 document.addEventListener('dragend',clearDropTargets);
 document.addEventListener('drop',clearDropTargets);
@@ -797,9 +907,10 @@ document.addEventListener('keydown',event=>{
   if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='z'&&!event.target.closest('input,textarea,select')&&!$('form-dialog').open){event.preventDefault();undo();}
   if(event.key==='Escape'&&!$('form-dialog').open&&!$('menu-dialog').open&&state.pane==='inspector'){state.pane=null;renderDetail();}
 });
-const sessionKeys=['serverRevision','conflict','dockerValidatedRevision','project','files','view','pane','selected','dirty','history','drafts','file','filesExpanded','collapsed','folders','touched','issues','validated','arriving'];
+const sessionKeys=['recoveryPending','recoveryScope','serverRevision','conflict','dockerValidatedRevision','project','files','view','pane','selected','dirty','history','drafts','file','filesExpanded','collapsed','folders','touched','issues','validated','arriving'];
 async function switchProject(identity) {
-  if(identity===state.activeProject||state.switching)return;
+  if(state.switching)return;
+  if(identity===state.activeProject){offerRecovery();return;}
   if(state.saving||state.deleting||state.runtimeBusy)throw new Error('Wait for the current file operation to finish.');
   state.switching=true;$('app').inert=true;++fileRequest;++previewRequest;clearTimeout(previewTimer);
   try {
@@ -807,13 +918,14 @@ async function switchProject(identity) {
     if(!session){
       // Explicit URLs keep these reads bound to their destination project.
       const read=async path=>{const response=await fetch(path+'?workspace='+encodeURIComponent(identity));const result=await response.json();if(!response.ok)throw new Error(result.error);return result;};
-      const {project,files,revision}=await read('/api/snapshot');
-      session={serverRevision:revision,conflict:false,dockerValidatedRevision:null,project,files,view:'build',pane:null,selected:null,dirty:false,history:[],drafts:new Map(),file:'',filesExpanded:true,collapsed:new Set(nodes(project).filter(node=>definition(node).op==='group').map(node=>node.id)),folders:new Set(),touched:new Set(),issues:[],validated:null,arriving:new Set()};
+      const {project,files,revision,recoveryScope}=await read('/api/snapshot');
+      session={recoveryPending:true,recoveryScope,serverRevision:revision,conflict:false,dockerValidatedRevision:null,project,files,view:'build',pane:null,selected:null,dirty:false,history:[],drafts:new Map(),file:'',filesExpanded:true,collapsed:new Set(nodes(project).filter(node=>definition(node).op==='group').map(node=>node.id)),folders:new Set(),touched:new Set(),issues:[],validated:null,arriving:new Set()};
     }
     if(state.activeProject)projectSessions.set(state.activeProject,Object.fromEntries(sessionKeys.map(key=>[key,state[key]])));
     Object.assign(state,session);state.activeProject=identity;state.view='build';state.pane=null;
     state.revision++;state.preview=null;state.previewRevision=-1;state.previewError='';state.drag=null;state.runtimeOutput='';state.runtimeServices=[];
     render();
+    offerRecovery();
   }finally{state.switching=false;$('app').inert=false;}
 }
 async function saveProjectFromOverview(identity) {
@@ -867,6 +979,7 @@ function deleteProject(project) {
     state.deleting=true;++fileRequest;++previewRequest;
     try {
       await api('/api/projects/delete',{action:'delete',id:project.id});
+      const deletedSession=project.id===state.activeProject?state:projectSessions.get(project.id);if(deletedSession?.recoveryScope)localStorage.removeItem(draftKey(deletedSession));
       projectSessions.delete(project.id);state.projects=state.projects.filter(p=>p.id!==project.id);
       if(state.activeProject===project.id){
         Object.assign(state,{project:null,files:[],dirty:false,history:[],drafts:new Map(),file:'',filesExpanded:true,collapsed:new Set(),folders:new Set(),touched:new Set(),issues:[],validated:null,arriving:new Set()});

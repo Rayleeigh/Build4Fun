@@ -44,7 +44,7 @@ class Revisions:
     def read(self, identity):
         workspace = self.projects.workspace(identity)
         project = read_yaml(workspace.project_path.read_text())
-        return {'project': normalize(project, self.definitions, workspace.listing()), 'files': workspace.listing(), 'revision': fingerprint(workspace)}
+        return {'project': normalize(project, self.definitions, workspace.listing()), 'files': workspace.listing(), 'revision': fingerprint(workspace), 'recoveryScope': hashlib.sha256(str(workspace.root).encode()).hexdigest()}
 
     def commit(self, identity, expected, project=None, edits=None, operation=None):
         workspace = self.projects.workspace(identity)

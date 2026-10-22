@@ -20,6 +20,8 @@ sys.path.insert(0, str(ROOT / 'application'))
 from core import registry
 from server import make_handler
 from storage import Workspace
+from projects import Projects
+from revisions import fingerprint
 
 
 def main():
@@ -36,6 +38,8 @@ def main():
         class FakeDocker:
             lock = threading.RLock()
             deployed = False
+            def plan(self, identity):
+                return {'deployed': self.deployed, 'changes': ['Add services: first'], 'revision': fingerprint(Projects(workspace).workspace(identity)) }
             def execute(self, identity, action, project=None):
                 if action == 'start':
                     self.deployed = True
@@ -413,6 +417,7 @@ def main():
                 page.get_by_role('button', name='Check with Docker', exact=True).click()
                 expect(page.get_by_label('Docker output')).to_contain_text('configuration is valid')
                 page.get_by_role('button', name='Start / Apply', exact=True).click()
+                page.get_by_role('button', name='Deploy now', exact=True).click()
                 expect(page.get_by_label('Docker output')).to_contain_text('Started test deployment')
                 page.get_by_role('button', name='Refresh status', exact=True).click()
                 expect(page.get_by_role('table', name='Service status')).to_contain_text('running')
@@ -429,6 +434,32 @@ def main():
                 page.get_by_role('button', name='Manage projects', exact=True).click()
                 expect(page.get_by_role('article', name='Lab two', exact=True)).to_have_count(0)
                 expect(page.locator('#workspace-navigation select')).to_have_count(0)
+                # Browser drafts restore both blocks and file edits after reload.
+                page.get_by_role('article', name='Project 1', exact=True).get_by_role('button', name='Open', exact=True).click()
+                page.get_by_role('button', name='Network map', exact=True).click()
+                expect(page.get_by_role('group', name='Service connections to networks, host ports and storage')).to_be_visible()
+                page.screenshot(path=str(artifacts / 'network-map.png'), full_page=True, animations='disabled')
+                page.locator('.topology').get_by_role('button', name='first', exact=True).click()
+                expect(page.locator('.service-card')).to_contain_text('first')
+                page.locator('#project-files').get_by_role('button', name='only-first.conf', exact=True).click()
+                page.get_by_role('textbox', name='Edit only-first.conf', exact=True).fill('recover this draft')
+                page.evaluate("state.project.children.find(n=>n.type==='service').values.name='recovered-service';changed()")
+                page.reload()
+                page.get_by_role('article', name='Project 1', exact=True).get_by_role('button', name='Open', exact=True).click()
+                expect(dialog.get_by_role('heading', name='Recover unsaved work?')).to_be_visible()
+                dialog.get_by_role('button', name='Cancel', exact=True).click()
+                expect(page.get_by_role('article', name='Project 1', exact=True)).to_be_visible()
+                page.get_by_role('article', name='Project 1', exact=True).get_by_role('button', name='Open', exact=True).click()
+                dialog.get_by_role('button', name='Recover draft', exact=True).click()
+                expect(page.locator('.service-card')).to_contain_text('recovered-service')
+                page.locator('#project-files').get_by_role('button', name='only-first.conf', exact=True).click()
+                expect(page.get_by_role('textbox', name='Edit only-first.conf', exact=True)).to_have_value('recover this draft')
+                page.get_by_role('button', name='Save project', exact=True).click()
+                expect(page.locator('#save-status')).to_have_text('All changes saved')
+                page.get_by_role('button', name='Back to build', exact=True).click()
+                page.get_by_role('button', name='Deploy', exact=True).click()
+                expect(dialog.get_by_role('heading', name='Deploy environment', exact=True)).to_be_visible()
+                dialog.get_by_role('button', name='Cancel', exact=True).click()
                 assert not errors, errors
                 browser.close()
         finally:

@@ -33,6 +33,31 @@ class RuntimeTests(unittest.TestCase):
             return json.dumps({'Service': 'worker', 'State': 'running', 'Name': 'test-runtime-worker-1'})
         return ''
 
+    def test_plan_tracks_configuration_and_files_without_docker(self):
+        identity = self.project['id']
+        self.workspace.write('settings.txt', 'first', create=True)
+        with patch.object(self.runtime, 'run', side_effect=self.fake):
+            plan = self.runtime.plan(identity)
+            self.assertFalse(plan['deployed'])
+            self.assertIn('Add services: worker', plan['changes'])
+            self.assertIn('Add file: settings.txt', plan['changes'])
+            self.assertEqual(self.calls, [])
+            self.runtime.execute(identity, 'start')
+            self.assertEqual(self.runtime.plan(identity)['changes'], [])
+            self.document['children'][-1]['children'][0]['values']['image'] = 'busybox:stable'
+            atomic_write(self.workspace.project_path, yaml.safe_dump(self.document))
+            self.workspace.write('settings.txt', 'second')
+            plan = self.runtime.plan(identity)
+            self.assertIn('Update services: worker (image)', plan['changes'])
+            self.assertIn('Update file: settings.txt', plan['changes'])
+            self.document['children'].pop()
+            # Keep a valid service while checking removal of the old one.
+            self.document['children'].append(block('service', {'name': 'replacement'}, block('image', {'image': 'busybox:latest'})))
+            atomic_write(self.workspace.project_path, yaml.safe_dump(self.document))
+            self.assertIn('Remove services: worker', self.runtime.plan(identity)['changes'])
+            self.workspace.path('settings.txt').unlink()
+            self.assertIn('Remove file: settings.txt', self.runtime.plan(identity)['changes'])
+
     def test_lifecycle_snapshot_name_lock_and_delete_guard(self):
         with patch.object(self.runtime, 'run', side_effect=self.fake):
             self.runtime.execute(self.project['id'], 'start')

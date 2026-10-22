@@ -5,7 +5,7 @@ import shutil
 import subprocess
 
 CHECK = '''
-import json, sys, tempfile, threading, urllib.request
+import json, os, sys, tempfile, threading, urllib.request, urllib.error
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 sys.path.insert(0, '/app/src/application')
@@ -21,6 +21,19 @@ with tempfile.TemporaryDirectory() as directory:
         assert urllib.request.urlopen(base).status == 200
         assert json.load(urllib.request.urlopen(base + '/api/projects')) == []
         assert 'service' in json.load(urllib.request.urlopen(base + '/api/definitions'))
+        # Docker can publish a different host port from the server's internal port.
+        os.environ['B4F_PUBLIC_PORT'] = '18081'
+        request = urllib.request.Request(base + '/api/projects', headers={
+            'Host': 'localhost:18081', 'Origin': 'http://localhost:18081'})
+        assert json.load(urllib.request.urlopen(request)) == []
+        for headers in ({'Host': 'untrusted.example:18081'},
+                        {'Host': 'localhost:18081', 'Origin': 'https://untrusted.example'}):
+            try:
+                urllib.request.urlopen(urllib.request.Request(base, headers=headers))
+                raise AssertionError('Untrusted host or origin was accepted')
+            except urllib.error.HTTPError as error:
+                assert error.code == 403
+
     finally:
         server.shutdown()
         server.server_close()

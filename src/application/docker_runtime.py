@@ -1,5 +1,6 @@
 """Execute only generated, workspace-owned Compose deployments on a local Engine."""
 import json
+import hashlib
 import os
 from pathlib import Path
 import subprocess
@@ -138,6 +139,40 @@ class DockerRuntime:
                     if port == other_port and protocol == other_protocol and overlap:
                         raise Invalid(f'Host port {port}/{protocol} is already published by another container.', code='port_conflict')
 
+    def deployment_state(self, workspace, project):
+        return {'compose': read_yaml(compose_yaml(project, self.definitions)),
+                'files': {entry['path']: hashlib.sha256(workspace.path(entry['path']).read_bytes()).hexdigest()
+                          for entry in workspace.listing() if not entry['directory']}}
+
+    def plan(self, identity):
+        workspace = self.projects.workspace(identity)
+        deployment = self.manifest(workspace)
+        current = self.deployment_state(workspace, read_yaml(workspace.project_path.read_text()))
+        previous = deployment.get('state') if deployment else None
+        changes = []
+        if deployment and previous is None:
+            changes.append('Existing deployment predates change tracking; its changes cannot be compared.')
+        before = (previous or {}).get('compose', {})
+        after = current['compose']
+        for section in ('services', 'networks', 'volumes'):
+            old, new = before.get(section, {}), after.get(section, {})
+            for name in sorted(set(old) | set(new)):
+                if name not in old:
+                    changes.append(f'Add {section}: {name}')
+                elif name not in new:
+                    changes.append(f'Remove {section}: {name}')
+                elif old[name] != new[name]:
+                    fields = ', '.join(sorted(key for key in set(old[name]) | set(new[name]) if old[name].get(key) != new[name].get(key)))
+                    changes.append(f'Update {section}: {name} ({fields})')
+        old_files = (previous or {}).get('files', {})
+        for name in sorted(set(old_files) | set(current['files'])):
+            if old_files.get(name) != current['files'].get(name):
+                verb = 'Remove' if name not in current['files'] else 'Add' if name not in old_files else 'Update'
+                changes.append(f'{verb} file: {name}')
+        if before.get('name') and before['name'] != after.get('name'):
+            changes.append('Compose name changed; remove the existing deployment before deploying.')
+        return {'deployed': bool(deployment), 'changes': changes, 'revision': fingerprint(workspace)}
+
     def execute(self, identity, action, project=None):
         if not self.lock.acquire(blocking=False):
             raise Invalid('Another Docker operation is in progress. Try again shortly.')
@@ -187,7 +222,7 @@ class DockerRuntime:
             deployed = workspace.root / 'compose.deployed.yaml'
             atomic_write(deployed, candidate.read_text())
             # Persist before up: failed/partial starts must remain manageable.
-            atomic_write(workspace.root / 'deployment.json', json.dumps({'name': name, 'endpoint': endpoint, 'revision': saved_revision, 'inputs': str(inputs.root)}))
+            atomic_write(workspace.root / 'deployment.json', json.dumps({'name': name, 'endpoint': endpoint, 'revision': saved_revision, 'inputs': str(inputs.root), 'state': self.deployment_state(workspace, project)}))
             output = self.compose(workspace, deployed, name, ['up', '-d', '--remove-orphans'], endpoint, 180)
             return {'message': 'Start command completed. Refresh status to check service health.', 'output': output}
         if not deployment:

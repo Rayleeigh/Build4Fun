@@ -1,0 +1,134 @@
+name: Release Build4Fun
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  build-test-publish:
+    # The release event has no tags filter; check the release's tag here.
+    if: startsWith(github.event.release.tag_name, 'v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    env:
+      TEST_IMAGE: build4fun-release-check:${{ github.run_id }}-${{ github.run_attempt }}
+      TEST_CONTAINER: build4fun-release-check
+      PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.playwright-browsers
+    steps:
+      - name: Check out the released tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Prepare image name and release tag
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          python - <<'PY'
+          import os
+          import re
+          if not re.fullmatch(r'v[A-Za-z0-9_.-]{0,127}', os.environ['RELEASE_TAG']):
+              raise SystemExit('Release tag must be a valid Docker tag starting with v (maximum 128 characters).')
+          with open(os.environ['GITHUB_ENV'], 'a') as output:
+              output.write('IMAGE=ghcr.io/' + os.environ['GITHUB_REPOSITORY'].lower() + '\n')
+              output.write('VERSION=' + os.environ['RELEASE_TAG'] + '\n')
+          PY
+
+      - name: Build the release image
+        run: |
+          docker build --file Dockerfile \
+            --label "org.opencontainers.image.source=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}" \
+            --label "org.opencontainers.image.revision=$(git rev-parse HEAD)" \
+            --label "org.opencontainers.image.version=${VERSION}" \
+            --tag "$TEST_IMAGE" .
+
+      - name: Host the image for testing
+        run: |
+          docker run --detach --name "$TEST_CONTAINER" \
+            --publish 127.0.0.1:8080:8080 "$TEST_IMAGE"
+
+      - name: Check the running application's HTTP endpoints
+        run: |
+          python - <<'PY'
+          import json
+          import time
+          import urllib.error
+          import urllib.request
+          base = 'http://127.0.0.1:8080'
+          for attempt in range(30):
+              try:
+                  with urllib.request.urlopen(base, timeout=2) as response:
+                      assert response.status == 200
+                      assert 'Build4Fun' in response.read().decode()
+                  break
+              except (OSError, urllib.error.URLError):
+                  if attempt == 29:
+                      raise
+                  time.sleep(1)
+          with urllib.request.urlopen(base + '/api/projects', timeout=5) as response:
+              assert json.load(response) == []
+          with urllib.request.urlopen(base + '/api/definitions', timeout=5) as response:
+              assert 'service' in json.load(response)
+          print('Published port, application startup, and HTTP API checks passed.')
+          PY
+
+      - name: Install test dependencies
+        run: python -m pip install -r requirements.txt -r src/tests/requirements.txt
+
+      - name: Run unit tests
+        run: python -m unittest discover -s src/tests -v
+
+      - name: Install browser
+        run: python -m playwright install --with-deps chromium
+
+      - name: Run browser regression checks
+        run: python src/tests/ui_smoke.py
+
+      - name: Run Docker lifecycle checks
+        run: python src/tests/docker_integration.py --run
+
+      - name: Validate the built image
+        run: python src/tests/container_smoke.py --image "$TEST_IMAGE"
+
+      # These steps run only after every validation step succeeds.
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish the tested image
+        run: |
+          docker tag "$TEST_IMAGE" "${IMAGE}:${VERSION}"
+          docker push "${IMAGE}:${VERSION}"
+
+      - name: Publish latest for stable releases
+        if: ${{ !github.event.release.prerelease }}
+        run: |
+          docker tag "$TEST_IMAGE" "${IMAGE}:latest"
+          docker push "${IMAGE}:latest"
+
+      - name: Show application logs on failure
+        if: failure()
+        run: docker logs "$TEST_CONTAINER" || true
+
+      - name: Remove the test container
+        if: always()
+        run: docker rm --force "$TEST_CONTAINER" || true

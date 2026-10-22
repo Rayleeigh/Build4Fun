@@ -1,15 +1,52 @@
 # Purpose
-> The purpose of this repository is to have an easy to build/understand introductionary course, into the foundations as a platform engineer for interested students. The goal hereby is to abstract the more complicated aspect of docker creation, networking, and system file architecture while still providing a rudementary understanding of how these things affect the endresult.
+
+Build4Fun helps interested students and introductory apprentices learn the
+foundations of platform engineering. It makes Docker services, networking, and
+storage easier to assemble while showing how each choice affects the result.
 
 ## Use case
-The use case derived itself from our observations in comprehension from the intrudtionary apprentices during our introductionary course. Repeatedly, it has been observed that the greatest challenged posed to the introductionary apprentices is that most commands and concepts do not stick during the limited timeframe the program is running. Thus the need for a more comprehensive course arose and now needs implementation.
+
+Our introductory course previously relied on writing Docker Compose files.
+Apprentices often struggled to retain both the commands and the underlying
+concepts within the limited course time. Learning YAML structure at the same
+time added another barrier.
+
+Build4Fun gives apprentices a way to construct an environment, inspect its
+configuration, run it, and observe what happens.
 
 ## Challenge
-The main challenge is to make the program approachable enough for new apprentices without oversimplifying the concepts and giving them enough depth to build a lasting understanding.
+
+The application must remain approachable without hiding the concepts apprentices
+need to understand. A successful exercise should help them explain how services
+connect, what a published port does, and where their data lives.
 
 ## Approach
-My approach to this challenge is straightforward: I take inspiration from Scratch. Block coding is where many of us started, offering a quick and playful way to develop the logical thinking needed in IT. It breaks down complex processes into simple, understandable blocks that make the underlying logic easier to grasp.
 
-The previous course relied on Docker Compose files. These describe how services are configured and connected, but their structure and configuration options can be difficult for an inexperienced apprentice to understand.
+The editor takes inspiration from Scratch. Visual blocks represent the parts of
+a Compose project: services, images, ports, environment variables, mounts,
+networks, and volumes. Apprentices assemble these pieces themselves rather than
+starting with preconfigured service recipes.
 
-This is where the block coding approach comes in handy: representing the main parts of a Compose file as visual building blocks, from the name and individual services to their configuration and supporting resources, such as networks and volumes. Apprentices can then assemble an environment piece by piece while learning how its components fit together.
+The live Compose preview links blocks to their generated YAML. The network map
+shows the connections between services, networks, host ports, and storage.
+Together, these views connect visual choices to the configuration apprentices
+will eventually write directly.
+
+Apprentices can deploy their projects to the local Docker Engine after reviewing
+changes. Status and service logs provide feedback for troubleshooting. Build4Fun
+checks its block structure and generated Compose configuration; service
+configuration files remain the apprentice's responsibility to research and debug.
+
+Saved versions and browser draft recovery support experimentation. Project
+exports let apprentices take their configuration and files outside the editor
+and continue working with Docker Compose directly.
+
+## Scope
+
+Build4Fun is intended for a trusted local learning environment with one server
+process per workspace. It manages independent projects on a local Docker Engine.
+Shared multiuser hosting and remote deployment are outside the current scope.
+Guided lessons and automatic exercise grading are not currently implemented.
+
+See the [user guide](../src/README.md) for the current workflow and the
+[implementation guide](implementation.md) for technical details and limitations.

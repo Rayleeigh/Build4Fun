@@ -42,7 +42,9 @@ def make_handler(workspace, definitions, runtime=None):
         def dispatch(self, mutation):
             port = self.server.server_port
             host = self.headers.get('Host', '')
-            if host not in (f'localhost:{port}', f'127.0.0.1:{port}'):
+            public_port = os.environ.get('B4F_PUBLIC_PORT', str(port))
+            allowed_hosts = {f'{name}:{value}' for name in ('localhost', '127.0.0.1') for value in (str(port), public_port)}
+            if host not in allowed_hosts:
                 self.respond(403, {'error': 'Use localhost or 127.0.0.1 to access this application.'})
                 return
             origin = self.headers.get('Origin')
@@ -103,6 +105,9 @@ def make_handler(workspace, definitions, runtime=None):
                 elif route.path == '/api/save' and mutation:
                     with runtime.lock:
                         self.respond(200, revisions.commit(identity, data.get('expectedRevision'), data['project'], data.get('files')))
+                elif route.path == '/api/deployment-plan' and not mutation:
+                    with runtime.lock:
+                        self.respond(200, runtime.plan(identity))
                 elif route.path == '/api/docker' and mutation:
                     with runtime.lock:
                         if data.get('action') in ('validate', 'start') and data.get('expectedRevision') != fingerprint(current_workspace):
