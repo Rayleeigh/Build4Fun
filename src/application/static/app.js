@@ -487,6 +487,7 @@ function blockPalette() {
 }
 function renderNavigation() {
   const nav=$('workspace-navigation');nav.replaceChildren(el('p','WORKSPACE','nav-label'));
+  const challenges=el('a','Apprentice challenges','nav-row');challenges.href='/challenges';challenges.target='_blank';challenges.rel='noopener';challenges.append(el('span','↗'));nav.append(challenges);
   const projectRow=el('div',undefined,'projects-navigation');
   const projects=button('Projects',()=>{state.projectsExpanded=!state.projectsExpanded;renderNavigation();$('projects-toggle').focus();},'tertiary',state.projectsExpanded?'down':'chevron');projects.id='projects-toggle';projects.className='nav-row';projects.setAttribute('aria-expanded',String(state.projectsExpanded));projects.setAttribute('aria-controls','project-tree');
   projectRow.append(projects,iconButton('more','Manage projects',()=>navigate('projects')));

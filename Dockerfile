@@ -7,6 +7,7 @@ COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 COPY src/application ./src/application
 COPY src/templates ./src/templates
+COPY docs/challenges ./docs/challenges
 ENV PYTHONUNBUFFERED=1
 EXPOSE 8080
 CMD ["python", "src/application/server.py", "--bind", "0.0.0.0", "--workspace", "/workspace"]

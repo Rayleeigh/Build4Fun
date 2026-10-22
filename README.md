@@ -45,6 +45,8 @@ docker run --rm -p 127.0.0.1:8080:8080 ghcr.io/rayleeigh/build4fun:latest
 
 ## Documentation
 
+- [Apprentice challenges](docs/challenges/README.md): six practical labs with
+  automatic saved-project checks at http://localhost:8080/challenges.
 - [Setup and user guide](src/README.md): environment settings, editor workflow,
   deployment, troubleshooting, and checks.
 - [Project purpose](docs/purpose.md): audience and learning approach.

@@ -4,5 +4,8 @@
 src/*
 !src/application/
 !src/templates/
+!docs/
+docs/*
+!docs/challenges/
 **/__pycache__/
 **/*.pyc

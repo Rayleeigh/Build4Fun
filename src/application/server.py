@@ -13,6 +13,7 @@ from projects import Projects
 from docker_runtime import DockerRuntime
 from revisions import Revisions, Conflict, fingerprint
 from export import project_bundle
+from challenges import progress, load_catalog, DOCS
 
 BASE = Path(__file__).resolve().parent
 
@@ -54,6 +55,20 @@ def make_handler(workspace, definitions, runtime=None):
             try:
                 route = urlsplit(self.path)
                 query = parse_qs(route.query)
+                if not mutation and route.path == '/api/challenges':
+                    with runtime.lock:
+                        self.respond(200, progress(projects, definitions))
+                    return
+                if not mutation and route.path == '/docs/challenges/catalog.json':
+                    self.respond(200, load_catalog())
+                    return
+                if not mutation and route.path.startswith('/docs/challenges/'):
+                    filename = route.path.removeprefix('/docs/challenges/')
+                    if filename not in {p.name for p in DOCS.glob('*.md')}:
+                        self.respond(404, {'error': 'Not found.'})
+                    else:
+                        self.respond(200, (DOCS / filename).read_bytes(), 'text/plain; charset=utf-8')
+                    return
                 if mutation:
                     if self.headers.get('Content-Type') != 'application/json':
                         raise Invalid('Expected a JSON request.')
@@ -139,9 +154,9 @@ def make_handler(workspace, definitions, runtime=None):
                     kind = {'/api/delete': 'delete', '/api/folder': 'folder', '/api/rename': 'rename'}[route.path]
                     with runtime.lock:
                         self.respond(200, revisions.commit(identity, data.get('expectedRevision'), project=data.get('project'), edits=data.get('files'), operation={**data, 'kind': kind}))
-                elif not mutation and route.path in ('/', '/app.js', '/style.css'):
-                    filename = {'/': 'index.html', '/app.js': 'app.js', '/style.css': 'style.css'}[route.path]
-                    kind = {'/': 'text/html; charset=utf-8', '/app.js': 'text/javascript; charset=utf-8', '/style.css': 'text/css; charset=utf-8'}[route.path]
+                elif not mutation and route.path in ('/', '/app.js', '/style.css', '/challenges', '/challenges.js', '/challenges.css'):
+                    filename = {'/': 'index.html', '/challenges': 'challenges.html'}.get(route.path, route.path.lstrip('/'))
+                    kind = 'text/html; charset=utf-8' if filename.endswith('.html') else 'text/javascript; charset=utf-8' if filename.endswith('.js') else 'text/css; charset=utf-8'
                     self.respond(200, (BASE / 'static' / filename).read_bytes(), kind)
                 else:
                     self.respond(404, {'error': 'Not found.'})
