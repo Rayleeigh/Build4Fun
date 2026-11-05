@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Code4Fun · My Server Dashboard</title>
+<link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script>
+</head>
+<body>
+<header class="topbar"><a class="brand" href="/" aria-label="Code4Fun home"><span class="brand-mark">&lt;/&gt;</span>code<span>4</span>fun</a><span class="project-title">My Server Dashboard <span class="tag">LEARNING LAB</span></span><a id="api-link" target="_blank" rel="noopener">API reference ↗</a></header>
+<main>
+<section class="intro"><div><p class="eyebrow">YOUR FIRST APPLICATION</p><h1>Small steps. Real code.</h1><p>Build a dashboard, one new skill at a time.</p></div><div class="progress"><span id="progress-count">0 / 6</span><span>stages explored &amp; completed</span><div class="progress-track"><div id="progress-fill"></div></div></div></section>
+<nav id="stages" aria-label="Learning stages"></nav>
+<div class="workspace">
+<aside class="lesson panel"><div class="panel-label"><span>01 / YOUR MISSION</span><span id="stage-number"></span></div><div class="lesson-body"><p class="eyebrow" id="focus"></p><h2 id="lesson-title"></h2><p id="goal"></p><ol id="steps"></ol><details><summary>Need a little help?</summary><div id="hints"></div></details><div class="lesson-note"><strong>Your project grows with you.</strong><p>Keep your earlier work. Switching stages only changes the instructions.</p></div></div><div class="lesson-footer"><button id="previous" class="quiet">← Previous</button><button id="next" class="quiet">Next stage →</button></div></aside>
+<section class="editor panel" aria-label="Code editor"><div class="panel-label"><span>02 / MAKE IT YOURS</span><span id="save-status">Loading…</span></div><div id="files" role="tablist" aria-label="Project files"></div><label id="editor-label" class="sr-only" for="code">Editing index.html</label><div class="code-area"><div id="line-numbers" aria-hidden="true">1</div><textarea id="code" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" aria-describedby="editor-help"></textarea></div><div class="editor-bottom"><span id="editor-help">Tab to indent · Ctrl/⌘ S to save</span><button class="quiet" id="download">Download backup ↓</button></div><div class="toolbar"><button id="save" class="secondary">Save project</button><button id="run" class="primary">Run preview <span>▶</span></button></div></section>
+<section class="preview panel" aria-label="Website preview and checks"><div class="panel-label"><span>03 / SEE IT WORK</span><span class="live-dot">PREVIEW</span></div><div class="browser-bar"><span>● ● ●</span><span>your-dashboard.local</span><button id="rerun" class="quiet" aria-label="Reload preview">↻</button></div><iframe id="preview" title="Your dashboard preview" sandbox="allow-scripts allow-same-origin"></iframe><div class="check-area"><div class="check-heading"><div><h2>Checkpoint</h2><p id="check-caption">Test the current stage’s requirements.</p></div><button id="check" class="secondary">Check my work</button></div><ul id="results" aria-live="polite"></ul><p class="check-note">Checks use example API data. Your normal preview uses the live API container.</p></div></section>
+</div>
+<footer><span>HTML → CSS → JavaScript → your first API</span><button id="reset" class="quiet danger">Reset entire project</button></footer>
+<div id="recovery" class="recovery" hidden><div><strong>A browser draft is available.</strong><p id="recovery-detail"></p></div><button id="recover" class="secondary">Recover draft</button><button id="discard" class="quiet">Discard draft</button></div>
+<p id="notice" role="status" aria-live="polite"></p>
+</main>
+</body></html>

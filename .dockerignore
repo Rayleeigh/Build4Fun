@@ -3,11 +3,13 @@
 !apps/
 apps/*
 !apps/build4fun/
+!apps/code4fun/
 apps/build4fun/*
 !apps/build4fun/application/
 !apps/build4fun/templates/
 !challenges/
 challenges/*
 !challenges/build/
+!challenges/code/
 **/__pycache__/
 **/*.pyc

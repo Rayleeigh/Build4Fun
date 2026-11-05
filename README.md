@@ -9,24 +9,23 @@ the images, ports, paths, and settings themselves.
 
 ## Monorepo
 
-This repository contains Build4Fun and reserves modules for two planned addons:
-Code4Fun, an interactive coding workspace, and Hack4Fun, a beginner CTF learning
-experience. Build4Fun is currently the runnable application.
+This repository contains Build4Fun, Code4Fun (an interactive frontend coding
+workspace), and a placeholder for Hack4Fun (a beginner CTF learning experience).
+Build4Fun and Code4Fun run independently.
 
 See [repository architecture](docs/monorepo.md) for module boundaries, challenge
 locations, and learning environments.
 
 ## Learning environments
 
-The root Dockerfile builds the Build4Fun controller. Future Code4Fun runtimes
-and Hack4Fun sandboxes will run separately from that controller; no learner
-runtime or sandbox images are implemented yet.
+The root Dockerfile builds the Build4Fun controller. Code4Fun has a separate
+workspace image and prepared API container; neither receives Docker access.
+Hack4Fun sandboxes remain future work.
 
 Learner environments must not receive the controller's Docker socket, workspace,
 or host filesystem mounts. Before introducing execution, define resource limits,
 privileges, network access, and reset/cleanup behavior. A container alone is not
-a complete sandbox design. Runtime image locations will be decided when these
-addons are implemented.
+a complete sandbox design. Code4Fun build files live under `apps/code4fun/`.
 
 ## Getting started
 
@@ -55,6 +54,16 @@ Stop Build4Fun with `docker compose stop`; apprentice deployments remain running
 docker run --rm -p 127.0.0.1:8080:8080 ghcr.io/rayleeigh/build4fun:latest
 ```
 
+### Run Code4Fun
+
+```sh
+docker compose -f compose.code4fun.yaml up --build -d --wait
+```
+
+Open http://localhost:8090 to build My Server Dashboard through six progressive
+HTML, CSS, JavaScript, and API stages. See the [Code4Fun guide](apps/code4fun/README.md)
+for API details, saved work, and checks. The first build includes Chromium.
+
 ## Features
 
 - Nested blocks with validation and a linked, live Compose preview.
@@ -66,8 +75,9 @@ docker run --rm -p 127.0.0.1:8080:8080 ghcr.io/rayleeigh/build4fun:latest
 
 ## Documentation
 
-- [Code4Fun plan](docs/code4fun/plan.md): learning stages, workspace, prepared API,
-  and implementation sequence.
+- [Code4Fun guide](apps/code4fun/README.md): launch, workflow, API, and checks.
+- [Code4Fun plan](docs/code4fun/plan.md) and [implementation](docs/code4fun/implementation.md):
+  learning stages and architecture.
 
 - [Apprentice challenges](challenges/build/README.md): six practical labs with
   automatic saved-project checks at http://localhost:8080/challenges.

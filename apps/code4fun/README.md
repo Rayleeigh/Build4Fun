@@ -1,11 +1,124 @@
 # Code4Fun
 
-Planned addon for application developer apprentices. Learners build one server
-dashboard progressively through HTML, CSS, JavaScript, and calls to a prepared
-API that reports its own container environment. No runnable Code4Fun application
-exists yet.
+Build one **My Server Dashboard** project through six stages: HTML, CSS,
+JavaScript, combined interactions, a first API call, and a live dashboard.
+The workspace includes instructions, hints, a three-file editor, separate-origin
+preview, saved progress, and browser checks. The prepared API reports its own
+container environment, not the apprentice's physical computer.
 
-Implementation belongs here; lesson content belongs in `challenges/code/`.
+## Run with Docker
 
-See the [Code4Fun plan](../../docs/code4fun/plan.md) and
+From the repository root, with Docker Engine and Compose running:
+
+```sh
+docker compose -f compose.code4fun.yaml up --build -d --wait
+```
+
+Open http://localhost:8090. Port 8091 serves the isolated preview and API proxy.
+The first build installs Chromium for behavior checks and can take a few minutes.
+Build4Fun continues to use the root `compose.yaml` and port 8080 independently.
+The Code4Fun API is a second service, reachable only through the workspace's
+preview proxy; it has no separately published host port.
+
+Optional `C4F_HTTP_PORT` and `C4F_PREVIEW_PORT` settings change the two published
+ports. Use distinct ports and open the workspace through localhost or 127.0.0.1.
+Both services run as an unprivileged user with resource limits; neither mounts
+the Docker socket or Build4Fun workspace.
+
+```sh
+docker compose -f compose.code4fun.yaml logs --tail 100
+docker compose -f compose.code4fun.yaml stop
+```
+
+Projects persist in the `code4fun-workspace` named volume. Stop and ordinary
+`down` preserve it; `down --volumes` deletes it. Back up the volume for durable
+external recovery.
+
+## Workspace
+
+- Edit `index.html`, `style.css`, or `script.js`. The initial HTML links both supporting files.
+- Run preview renders a snapshot of current edits. Save project stores files and the selected stage atomically.
+- Check my work saves first, then evaluates the selected stage in Chromium using controlled API data. Stage 6 also checks delayed responses, failures, null measurements, and periodic refresh.
+- Switching stages preserves the project. Completion badges record previously passed checkpoints; they are learning history, not a claim that the current code still passes every earlier stage.
+- Browser drafts can be recovered after refresh. Older drafts preserve save conflicts. Download a backup before reloading if a newer save exists.
+- Download backup saves a JSON copy of all three files and the selected stage. It can be read and copied manually; automatic backup import is not implemented.
+- Reset entire project asks for confirmation, replaces all three files with starter content, and clears all progress. Individual-stage resets are not offered.
+
+The lesson panel specifies the element IDs and behaviors checked at each stage.
+Checks accept different implementations; API checks change sample values to
+reject hardcoded responses. Regular previews always use the live API.
+
+## Prepared API
+
+Open http://localhost:8091/api/info for field descriptions, units, availability,
+and scope. Trailing slashes are accepted for all five read-only GET endpoints:
+
+| Endpoint | Response |
+| --- | --- |
+| `/api/info` | API contract and metric availability |
+| `/api/username/` | `{"username":"code4fun"}` |
+| `/api/hostname/` | `{"hostname":"code4fun-api"}` |
+| `/api/ip` | `{"addresses":["172.20.0.3"]}` (actual addresses vary) |
+| `/api/metrics` | `cpu_percent`, `memory_used_bytes`, `memory_limit_bytes`, `uptime_seconds` |
+
+Measurements use Linux cgroup v2. Memory includes cache; an unlimited memory
+limit is null. CPU is sampled between requests and normalized to the smaller
+of effective cpuset size and CPU quota; the first sample is null. If accounting
+files are unavailable, those measurements are null rather than host-wide values.
+API uptime measures this API process. Refresh around every five seconds.
+Unknown endpoints return 404 JSON; POST returns 405 JSON. Responses are not cached.
+
+The API resolves addresses for the container hostname and excludes loopback and
+unspecified addresses. It does not enumerate every possible network interface.
+The workspace returns a 502 JSON error if the API cannot be reached.
+
+## Run natively for development
+
+Use two terminals from the repository root:
+
+```sh
+.venv/bin/python -m pip install -r apps/code4fun/workspace/requirements.txt
+PLAYWRIGHT_BROWSERS_PATH=.venv/browsers .venv/bin/python -m playwright install chromium
+.venv/bin/python apps/code4fun/api/server.py
+```
+
+```sh
+PLAYWRIGHT_BROWSERS_PATH=.venv/browsers .venv/bin/python apps/code4fun/workspace/server.py
+```
+
+This stores work in `.workspace/code4fun/`. A native API reports its native process
+environment; use the Docker stack for the intended container measurements.
+Linux native installs may also require Playwright's `install --with-deps chromium`.
+
+## Checks
+
+```sh
+.venv/bin/python -m unittest discover -s apps/code4fun/tests -v
+PLAYWRIGHT_BROWSERS_PATH=.venv/browsers .venv/bin/python apps/code4fun/tests/ui_smoke.py
+.venv/bin/python apps/code4fun/tests/container_smoke.py
+```
+
+The browser suite uses temporary files and ephemeral localhost ports. It checks
+editing, saved state, draft recovery, all six stage solutions, negative cases,
+and API isolation. Screenshots are written to `/tmp/code4fun-desktop.png` and
+`/tmp/code4fun-mobile.png`. Container checks build an independently named stack,
+exercise container measurements and browser checks, restart for persistence,
+and remove only their own stack and volume. CI runs all three checks.
+
+## Current boundaries
+
+This is a trusted local learning workspace with one shared project per instance,
+not a shared hosting service. There are no accounts, multiuser sessions, or
+apprentice-written backends. The editor is plain text, without syntax highlighting
+or arbitrary extra files. Stage checks are formative feedback, not tamper-proof
+assessment. The API reference currently displays JSON.
+
+The preview uses a different port/origin, an iframe sandbox, and a restrictive
+content security policy. Check browsers block requests outside the snapshot and
+mock API, and check processes have a 60-second limit. These controls are not a
+hardened hostile-code hosting service. Close a looping preview by running corrected
+code or reloading the workspace. Do not expose this setup as a public multiuser IDE.
+
+See the [plan](../../docs/code4fun/plan.md),
+[implementation guide](../../docs/code4fun/implementation.md), and
 [repository architecture](../../docs/monorepo.md).

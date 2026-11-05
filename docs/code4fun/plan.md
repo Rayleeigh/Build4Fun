@@ -1,7 +1,10 @@
 # Code4Fun implementation plan
 
-Status: agreed product direction, before implementation. Code4Fun is a planned
-addon; this document does not describe currently available functionality.
+Status: original product plan, now implemented as an initial local version.
+The [implementation guide](implementation.md) and [user guide](../../apps/code4fun/README.md)
+record the current architecture, concrete checkpoint contracts, and limitations.
+The sections below preserve the planning rationale; proposed choices have been
+resolved as described in those guides.
 
 ## Purpose and learner workflow
 
@@ -143,14 +146,15 @@ Implement in reviewable increments:
 4. Add stages 1–4, checkpoint feedback, and progression that retains files.
 5. Add stages 5–6 against the prepared API, including controlled browser checks.
 
-## Decisions still needed
+## Original implementation decisions
 
-- Local execution per apprentice versus centrally hosted individual sessions.
-  The current Build4Fun setup is local; shared Code4Fun hosting is not yet agreed.
-- Workspace layout, editor component, storage format, and draft recovery behavior.
-- Exact checkpoint contracts, progress invalidation rules, and reset/recovery semantics.
-- API contract details listed above and resource limits for its containers.
-- Browser origin isolation and the execution boundary for automated checks.
+The initial implementation selects local execution, a plain text three-file
+editor, atomic JSON persistence with revision conflicts, browser draft recovery,
+historical completion badges, and confirmed whole-project reset. The stage
+instructions specify element IDs and behaviors. The API contract is served at
+`/api/info`; resource limits live in `compose.code4fun.yaml`. Preview origins and
+check-process boundaries are described in the implementation guide. Shared hosting
+and individual accounts remain unimplemented.
 
 Hack4Fun, apprentice-written backends, a browser terminal, and shared-hosting
 accounts are outside this initial Code4Fun plan.

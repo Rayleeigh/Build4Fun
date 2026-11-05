@@ -1,22 +1,21 @@
 # Repository architecture
 
 Build4Fun, Code4Fun, and Hack4Fun live in one repository with separate application
-directories. Build4Fun is the existing runnable application; the other two are
-planned addons with documented locations for future implementation.
+directories. Build4Fun and Code4Fun are runnable local applications. Hack4Fun remains planned.
 
 | Location | Responsibility |
 | --- | --- |
 | `apps/build4fun/application/` | Existing Python backend and browser interface |
 | `apps/build4fun/templates/` | Compose block definitions |
 | `apps/build4fun/tests/` | Build4Fun unit, browser, and Docker checks |
-| `apps/code4fun/` | Future interactive coding workspace |
+| `apps/code4fun/` | Coding workspace, prepared API, image builds, and tests |
 | `apps/hack4fun/` | Future beginner CTF interface and sessions |
 | `challenges/build/` | Existing Compose lessons and configuration checks |
-| `challenges/code/` | Future coding lessons and behavior checks |
+| `challenges/code/` | Six progressive coding stages and starter files |
 | `challenges/hack/` | Future CTF scenarios and flag verification |
 | `docs/monorepo.md` | Shared repository architecture |
 | `docs/build4fun/` | Build4Fun purpose, implementation, and images |
-| `docs/code4fun/` | Code4Fun product and implementation planning |
+| `docs/code4fun/` | Code4Fun plan and implementation documentation |
 
 Documentation follows the application boundaries: shared repository guidance
 stays directly under `docs/`, and application-specific documents live under
@@ -27,7 +26,9 @@ The [Code4Fun plan](code4fun/plan.md) defines one progressively developed server
 dashboard, six frontend learning stages, and a separate prepared API container.
 
 Run commands from the repository root. The root Dockerfile, Compose file,
-requirements, and GitHub workflows continue to build and validate Build4Fun.
+and requirements continue to build Build4Fun. `compose.code4fun.yaml` starts the
+Code4Fun workspace and prepared API as a separate stack on ports 8090 and 8091.
+GitHub checks validate both applications independently.
 Existing workspace locations, environment variables, deployment ownership,
 and public `/docs/challenges/` URLs remain compatible. Lesson files now live in
 `challenges/build/`; only that directory feeds the current challenge catalog.
@@ -40,5 +41,6 @@ addon directories.
 Repository boundaries do not define runtime isolation. Learner code and CTF
 sandboxes must run separately from the controller, without its Docker access.
 Individual sessions and stronger isolation are required before shared hosting.
-Code4Fun, Hack4Fun, their browser terminal, and application behavior checks are
-future implementation work, not features enabled by this reorganization.
+Code4Fun's separate-origin preview and controlled browser checks are documented
+in its [implementation guide](code4fun/implementation.md). Hack4Fun and a browser
+terminal remain future work.

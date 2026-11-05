@@ -1,0 +1,50 @@
+[
+  {
+    "title": "Give your dashboard structure",
+    "focus": "Basic HTML",
+    "goal": "Introduce your dashboard and make room for server information.",
+    "steps": ["Add a non-empty h1 and a paragraph introducing your dashboard.", "Add a section with id=server-info containing a heading (h2)."],
+    "hints": ["HTML tags describe meaning: h1 is the page heading, p is a paragraph, section groups related content.", "Use id=\"server-info\" on your section so later stages can find it."],
+    "checks": ["A page heading", "An introduction", "A server information section with a heading"]
+  },
+  {
+    "title": "Make it your own",
+    "focus": "HTML + CSS",
+    "goal": "Turn your server section into a readable information card.",
+    "steps": ["In style.css, give the body a background color other than transparent or white.", "Give #server-info at least 12px padding and a visible border with width of at least 1px."],
+    "hints": ["Select the whole page with body and your section with #server-info.", "Try the CSS properties background-color, padding, and border. Choose your own colors."],
+    "checks": ["A colored page background", "A padded server card", "A visible card border"]
+  },
+  {
+    "title": "Add your first interaction",
+    "focus": "HTML + JavaScript",
+    "goal": "Use a button to change a message without reloading the page. Keep your CSS.",
+    "steps": ["Add a button with id=greet and a visible text element with id=message.", "In script.js, make clicking #greet change the text of #message to a non-empty greeting."],
+    "hints": ["document.querySelector finds an element using a CSS selector.", "Use addEventListener('click', ...) and change the message element's textContent."],
+    "checks": ["The greeting button changes the message"]
+  },
+  {
+    "title": "Switch the atmosphere",
+    "focus": "HTML + CSS + JavaScript",
+    "goal": "Connect JavaScript state to CSS with a reversible theme switch.",
+    "steps": ["Add a button with id=theme-toggle.", "Make each click switch the body's computed background color. A second click must restore it."],
+    "hints": ["A class on body can select a different set of styles.", "classList.toggle can add and remove the same class on successive clicks."],
+    "checks": ["The theme changes and switches back"]
+  },
+  {
+    "title": "Meet your server",
+    "focus": "Your first API call",
+    "goal": "Replace invented server information with a real response.",
+    "steps": ["Read /api/info using the API reference link.", "On page load, fetch /api/hostname/ and put its hostname into a visible element with id=hostname."],
+    "hints": ["fetch returns a response; response.json() reads the JSON body.", "The JSON has a hostname property. The server is the API container, not your laptop."],
+    "checks": ["The hostname comes from the API"]
+  },
+  {
+    "title": "Bring the dashboard to life",
+    "focus": "A complete API dashboard",
+    "goal": "Display current information and communicate what happens during requests.",
+    "steps": ["On page load, call /api/username/, /api/hostname/, /api/ip, and /api/metrics.", "Display values in visible elements with ids username, hostname, addresses, cpu, memory, memory-limit, and uptime. Keep numeric metrics in their API units; labels may surround them. Display N/A for null metrics.", "Add a button with id=refresh that reloads all four endpoints. Also refresh automatically every 5 seconds.", "While requests are pending, show Loading in a visible element with id=status. Clear Loading after completion. On a failed HTTP response or network failure, show Error or Failed there; a later successful refresh must clear the error."],
+    "hints": ["Use response.ok to detect HTTP errors; fetch does not reject just because a server returns 500.", "Use try/catch/finally to manage success, errors, and loading. Start with one endpoint before adding the others.", "setInterval schedules periodic work. Handle null metrics explicitly: zero is a valid measurement.", "Keep the last successful readings on screen while refreshing. Test unavailable metrics with the Check my work action."],
+    "checks": ["All four endpoints supply the displayed values", "Refresh retrieves changed readings", "Readings update automatically", "Loading is visible and clears", "HTTP failures are visible and recover", "Network failures are visible and recover", "Unavailable metrics show N/A"]
+  }
+]
