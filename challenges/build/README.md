@@ -81,7 +81,7 @@ contains: '<h1>Build4Fun apprentice</h1>'
 
 Bind mount sources use `./index.html`; named volumes use their declared name. Missing `read_only` in Compose means false. Ports use short syntax, including the protocol, such as `127.0.0.1:8081:80/tcp`. File conditions only allow project-relative paths. Quote strings that YAML might otherwise treat as booleans or numbers.
 
-Runtime experiments and explanations are not automatically graded. New kinds of conditions beyond this vocabulary require extending `src/application/challenges.py`.
+Runtime experiments and explanations are not automatically graded. New kinds of conditions beyond this vocabulary require extending `apps/build4fun/application/challenges.py`.
 
 ## Docker
 

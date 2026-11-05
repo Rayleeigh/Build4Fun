@@ -1,5 +1,5 @@
 """Read-only Docker integration check; creates no images, containers, or networks.
-Run: .venv/bin/python src/tests/docker_check.py
+Run: .venv/bin/python apps/build4fun/tests/docker_check.py
 """
 import tempfile
 from pathlib import Path

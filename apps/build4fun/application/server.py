@@ -1,4 +1,4 @@
-"""Local prototype server. Run with python src/application/server.py."""
+"""Local prototype server. Run with python apps/build4fun/application/server.py."""
 import argparse
 import json
 import os

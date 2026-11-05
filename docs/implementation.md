@@ -3,7 +3,7 @@
 Build4Fun is a local web application with a Python backend and a browser editor
 written in JavaScript and CSS. YAML files define the available blocks. The
 backend saves projects, generates Compose output, and invokes the Docker CLI.
-See the [user guide](../src/README.md) for installation and commands, and
+See the [user guide](../apps/build4fun/README.md) for installation and commands, and
 [project purpose](purpose.md) for the educational goals.
 
 ## Runtime and installation
@@ -38,17 +38,17 @@ the Docker CLI executable. One server process should own each workspace.
 
 | Path | Responsibility |
 | --- | --- |
-| `src/application/server.py` | HTTP routes, request checks, and application startup. |
-| `src/application/core.py` | Definition registry, block validation, Compose assembly, and preview source mapping. |
-| `src/application/references.py` | Resource and file references with stable identities. |
-| `src/application/storage.py` | Workspace paths and file operations. |
-| `src/application/projects.py` | Project listing, identity, naming, and deletion. |
-| `src/application/revisions.py` | Atomic saves, revision conflicts, history, and restoration. |
-| `src/application/export.py` | Portable project ZIP generation. |
-| `src/application/docker_runtime.py` | Deployment planning, Docker validation, ownership checks, and lifecycle operations. |
-| `src/application/static/` | Browser state, block editor, file explorer, map, preview, and styles. |
-| `src/templates/` | YAML block definitions loaded at startup. |
-| `src/tests/` | Unit, browser, Docker, and container checks with isolated fixtures. |
+| `apps/build4fun/application/server.py` | HTTP routes, request checks, and application startup. |
+| `apps/build4fun/application/core.py` | Definition registry, block validation, Compose assembly, and preview source mapping. |
+| `apps/build4fun/application/references.py` | Resource and file references with stable identities. |
+| `apps/build4fun/application/storage.py` | Workspace paths and file operations. |
+| `apps/build4fun/application/projects.py` | Project listing, identity, naming, and deletion. |
+| `apps/build4fun/application/revisions.py` | Atomic saves, revision conflicts, history, and restoration. |
+| `apps/build4fun/application/export.py` | Portable project ZIP generation. |
+| `apps/build4fun/application/docker_runtime.py` | Deployment planning, Docker validation, ownership checks, and lifecycle operations. |
+| `apps/build4fun/application/static/` | Browser state, block editor, file explorer, map, preview, and styles. |
+| `apps/build4fun/templates/` | YAML block definitions loaded at startup. |
+| `apps/build4fun/tests/` | Unit, browser, Docker, and container checks with isolated fixtures. |
 
 ## Block model and Compose assembly
 
@@ -77,7 +77,7 @@ Compose project
 
 ![Original block editor concept](images/compose_buidlingblock_idea.png)
 
-Definitions in `src/templates/` specify inputs, allowed children, repeatability,
+Definitions in `apps/build4fun/templates/` specify inputs, allowed children, repeatability,
 assembly targets, and operations. The registry supports `root`, `group`, `named`,
 `set`, and `append` operations, with text, integer, choice, and boolean inputs.
 Definitions load at startup; changes require restarting the Python server or
@@ -219,7 +219,7 @@ Docker controls. Browser checks use an isolated workspace and simulated Docker
 operations, including draft recovery, map navigation, and deployment review.
 Container checks verify HTTP access and Host/Origin checks. Real Docker lifecycle
 checks are opt-in locally and run in CI alongside the other checks. Commands are
-listed in the [user guide](../src/README.md#checks).
+listed in the [user guide](../apps/build4fun/README.md#checks).
 
 ## Current boundaries
 

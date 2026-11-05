@@ -1,6 +1,6 @@
 """Real-browser regression checks. Uses an isolated temporary workspace.
 
-Run: PLAYWRIGHT_BROWSERS_PATH=.venv/browsers .venv/bin/python src/tests/ui_smoke.py
+Run: PLAYWRIGHT_BROWSERS_PATH=.venv/browsers .venv/bin/python apps/build4fun/tests/ui_smoke.py
 """
 import argparse
 import os

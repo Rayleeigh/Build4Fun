@@ -3,7 +3,7 @@ import re
 from pathlib import Path
 from core import Invalid, compile_project, read_yaml
 
-DOCS = Path(__file__).resolve().parents[2] / 'docs' / 'challenges'
+DOCS = Path(__file__).resolve().parents[3] / 'challenges' / 'build'
 MISSING = object()
 
 

@@ -8,12 +8,12 @@ CHECK = '''
 import json, os, sys, tempfile, threading, urllib.request, urllib.error
 from http.server import ThreadingHTTPServer
 from pathlib import Path
-sys.path.insert(0, '/app/src/application')
+sys.path.insert(0, '/app/apps/build4fun/application')
 from server import make_handler
 from storage import Workspace
 from core import registry
 with tempfile.TemporaryDirectory() as directory:
-    server = ThreadingHTTPServer(('127.0.0.1', 0), make_handler(Workspace(directory), registry(Path('/app/src/templates'))))
+    server = ThreadingHTTPServer(('127.0.0.1', 0), make_handler(Workspace(directory), registry(Path('/app/apps/build4fun/templates'))))
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     try:

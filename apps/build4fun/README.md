@@ -5,8 +5,8 @@ a network map, saved versions, browser draft recovery, and local Docker
 deployment. New projects contain a project name and no prefilled services;
 apprentices supply their own images, ports, paths, and settings.
 
-See the [project overview](../README.md), [purpose](../docs/purpose.md), and
-[implementation guide](../docs/implementation.md) for background and architecture.
+See the [project overview](../../README.md), [purpose](../../docs/purpose.md), and
+[implementation guide](../../docs/implementation.md) for background and architecture.
 
 ## Container installation
 
@@ -25,7 +25,7 @@ docker compose up --build -d --wait
 
 Open http://localhost:8080. The supplied Compose file publishes only to localhost.
 Compose creates the workspace directory if it is missing. `.env` is ignored by
-Git; [`.env.example`](../.env.example) documents the settings:
+Git; [`.env.example`](../../.env.example) documents the settings:
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
@@ -56,7 +56,7 @@ need a separate entry in `.env`. Inside the container, `DOCKER_HOST` points to
 `unix:///var/run/docker.sock` regardless of the socket's location on the host.
 
 The socket grants control over the Docker host, so use this in the trusted local
-learning environment described in the [implementation guide](../docs/implementation.md). Stop the app with
+learning environment described in the [implementation guide](../../docs/implementation.md). Stop the app with
 `docker compose stop`; this preserves its workspace and apprentice deployments.
 
 ## Run with Python
@@ -66,7 +66,7 @@ From the repository root, with Python 3.9 or newer:
 ```sh
 python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt
-.venv/bin/python src/application/server.py
+.venv/bin/python apps/build4fun/application/server.py
 ```
 
 Open http://127.0.0.1:8080. The server binds to loopback by default. Use `--port` or
@@ -185,9 +185,9 @@ syntax are valid; Build4Fun uses short syntax for a more readable preview.
 
 ## Storage and export
 
-- `src/application/`: backend, assembler, persistence, and browser assets.
-- `src/templates/`: one YAML definition per generic Compose block.
-- `src/tests/`: unit tests, browser regression checks, and isolated example fixtures.
+- `apps/build4fun/application/`: backend, assembler, persistence, and browser assets.
+- `apps/build4fun/templates/`: one YAML definition per generic Compose block.
+- `apps/build4fun/tests/`: unit tests, browser regression checks, and isolated example fixtures.
 
 The original workspace is read from `.workspace/project.yaml` and `.workspace/files/`.
 New projects live in `.workspace/projects/<stable-id>/`. On saving, blocks and file
@@ -274,15 +274,15 @@ not offered by these controls.
 ## Checks
 
 ```sh
-.venv/bin/python -m unittest discover -s src/tests -v
+.venv/bin/python -m unittest discover -s apps/build4fun/tests -v
 ```
 
 Optional browser checks (run from the repository root):
 
 ```sh
-.venv/bin/python -m pip install -r src/tests/requirements.txt
+.venv/bin/python -m pip install -r apps/build4fun/tests/requirements.txt
 PLAYWRIGHT_BROWSERS_PATH=.venv/browsers .venv/bin/python -m playwright install chromium
-PLAYWRIGHT_BROWSERS_PATH=.venv/browsers .venv/bin/python src/tests/ui_smoke.py
+PLAYWRIGHT_BROWSERS_PATH=.venv/browsers .venv/bin/python apps/build4fun/tests/ui_smoke.py
 ```
 
 The browser checks start a temporary localhost server and use their own workspace.
@@ -293,8 +293,8 @@ To explore the populated `homelab` example without changing your own workspace:
 
 ```sh
 mkdir -p /tmp/build4fun-homelab
-cp src/tests/fixtures/homelab/project.yaml /tmp/build4fun-homelab/project.yaml
-.venv/bin/python src/application/server.py --workspace /tmp/build4fun-homelab --port 8081
+cp apps/build4fun/tests/fixtures/homelab/project.yaml /tmp/build4fun-homelab/project.yaml
+.venv/bin/python apps/build4fun/application/server.py --workspace /tmp/build4fun-homelab --port 8081
 ```
 
 Open http://127.0.0.1:8081. This copies example blocks for exploring the editor.
@@ -304,7 +304,7 @@ inserted into new projects.
 Run the read-only Docker integration check with:
 
 ```bash
-.venv/bin/python src/tests/docker_check.py
+.venv/bin/python apps/build4fun/tests/docker_check.py
 ```
 
 It validates generated Compose YAML and checks the Engine without creating resources.
@@ -314,17 +314,17 @@ To check the built container image, including its HTTP API and Host/Origin check
 
 ```sh
 docker build -t build4fun-local-check .
-.venv/bin/python src/tests/container_smoke.py
+.venv/bin/python apps/build4fun/tests/container_smoke.py
 ```
 
 This starts temporary containers without publishing ports or mounting the host
-Docker socket. See [CI checks](../.github/workflows/checks.yml) for the complete
+Docker socket. See [CI checks](../../.github/workflows/checks.yml) for the complete
 verification sequence.
 
 ## Full lifecycle regression
 
 ```sh
-.venv/bin/python src/tests/docker_integration.py --run
+.venv/bin/python apps/build4fun/tests/docker_integration.py --run
 ```
 
 This opt-in test pulls `nginx:alpine` if needed and creates a uniquely named test
@@ -336,7 +336,7 @@ The GitHub Actions workflow runs unit, browser, and real lifecycle checks.
 
 ## Release images
 
-[The release workflow](../.github/workflows/release.yml) runs when a GitHub
+[The release workflow](../../.github/workflows/release.yml) runs when a GitHub
 release is published with a tag starting with `v`, including prereleases. The tag
 must also be a valid Docker image tag. Publishing a tag alone does not trigger it.
 

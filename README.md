@@ -7,6 +7,27 @@ YAML, and deploy the environment to a local Docker Engine.
 Projects start with a project name and no prefilled services. Apprentices choose
 the images, ports, paths, and settings themselves.
 
+## Monorepo
+
+This repository contains Build4Fun and reserves modules for two planned addons:
+Code4Fun, an interactive coding workspace, and Hack4Fun, a beginner CTF learning
+experience. Build4Fun is currently the runnable application.
+
+See [repository architecture](docs/monorepo.md) for module boundaries, challenge
+locations, and learning environments.
+
+## Learning environments
+
+The root Dockerfile builds the Build4Fun controller. Future Code4Fun runtimes
+and Hack4Fun sandboxes will run separately from that controller; no learner
+runtime or sandbox images are implemented yet.
+
+Learner environments must not receive the controller's Docker socket, workspace,
+or host filesystem mounts. Before introducing execution, define resource limits,
+privileges, network access, and reset/cleanup behavior. A container alone is not
+a complete sandbox design. Runtime image locations will be decided when these
+addons are implemented.
+
 ## Getting started
 
 ### Install with docker compose
@@ -45,9 +66,9 @@ docker run --rm -p 127.0.0.1:8080:8080 ghcr.io/rayleeigh/build4fun:latest
 
 ## Documentation
 
-- [Apprentice challenges](docs/challenges/README.md): six practical labs with
+- [Apprentice challenges](challenges/build/README.md): six practical labs with
   automatic saved-project checks at http://localhost:8080/challenges.
-- [Setup and user guide](src/README.md): environment settings, editor workflow,
+- [Setup and user guide](apps/build4fun/README.md): environment settings, editor workflow,
   deployment, troubleshooting, and checks.
 - [Project purpose](docs/purpose.md): audience and learning approach.
 - [Implementation](docs/implementation.md): architecture, persistence,
@@ -58,7 +79,7 @@ docker run --rm -p 127.0.0.1:8080:8080 ghcr.io/rayleeigh/build4fun:latest
 
 Published GitHub releases with a `v` tag build and test the Docker image before
 publishing to `ghcr.io/rayleeigh/build4fun:<release-tag>`. Stable releases also
-update `latest`. See [release image validation](src/README.md#release-images).
+update `latest`. See [release image validation](apps/build4fun/README.md#release-images).
 
 ## License
 
