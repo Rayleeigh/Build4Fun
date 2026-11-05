@@ -5,8 +5,8 @@ a network map, saved versions, browser draft recovery, and local Docker
 deployment. New projects contain a project name and no prefilled services;
 apprentices supply their own images, ports, paths, and settings.
 
-See the [project overview](../../README.md), [purpose](../../docs/purpose.md), and
-[implementation guide](../../docs/implementation.md) for background and architecture.
+See the [project overview](../../README.md), [purpose](../../docs/build4fun/purpose.md), and
+[implementation guide](../../docs/build4fun/implementation.md) for background and architecture.
 
 ## Container installation
 
@@ -56,7 +56,7 @@ need a separate entry in `.env`. Inside the container, `DOCKER_HOST` points to
 `unix:///var/run/docker.sock` regardless of the socket's location on the host.
 
 The socket grants control over the Docker host, so use this in the trusted local
-learning environment described in the [implementation guide](../../docs/implementation.md). Stop the app with
+learning environment described in the [implementation guide](../../docs/build4fun/implementation.md). Stop the app with
 `docker compose stop`; this preserves its workspace and apprentice deployments.
 
 ## Run with Python

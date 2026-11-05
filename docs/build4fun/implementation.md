@@ -3,19 +3,19 @@
 Build4Fun is a local web application with a Python backend and a browser editor
 written in JavaScript and CSS. YAML files define the available blocks. The
 backend saves projects, generates Compose output, and invokes the Docker CLI.
-See the [user guide](../apps/build4fun/README.md) for installation and commands, and
+See the [user guide](../../apps/build4fun/README.md) for installation and commands, and
 [project purpose](purpose.md) for the educational goals.
 
 ## Runtime and installation
 
-The [Dockerfile](../Dockerfile) builds an image containing Python, the application,
+The [Dockerfile](../../Dockerfile) builds an image containing Python, the application,
 block templates, the Docker CLI, and the Compose plugin. The server listens on
-`0.0.0.0:8080` inside the container. [compose.yaml](../compose.yaml) publishes that
+`0.0.0.0:8080` inside the container. [compose.yaml](../../compose.yaml) publishes that
 port on `127.0.0.1`, mounts the workspace at `/workspace`, and mounts the host
 Docker socket. Apprentice containers run on the host Engine alongside Build4Fun.
 The health check requests the application's HTTP API.
 
-[.env.example](../.env.example) documents the installation settings:
+[.env.example](../../.env.example) documents the installation settings:
 
 | Setting | Role |
 | --- | --- |
@@ -219,7 +219,7 @@ Docker controls. Browser checks use an isolated workspace and simulated Docker
 operations, including draft recovery, map navigation, and deployment review.
 Container checks verify HTTP access and Host/Origin checks. Real Docker lifecycle
 checks are opt-in locally and run in CI alongside the other checks. Commands are
-listed in the [user guide](../apps/build4fun/README.md#checks).
+listed in the [user guide](../../apps/build4fun/README.md#checks).
 
 ## Current boundaries
 

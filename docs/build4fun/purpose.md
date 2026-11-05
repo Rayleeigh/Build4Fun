@@ -48,5 +48,5 @@ process per workspace. It manages independent projects on a local Docker Engine.
 Shared multiuser hosting and remote deployment are outside the current scope.
 Guided lessons and automatic exercise grading are not currently implemented.
 
-See the [user guide](../apps/build4fun/README.md) for the current workflow and the
+See the [user guide](../../apps/build4fun/README.md) for the current workflow and the
 [implementation guide](implementation.md) for technical details and limitations.

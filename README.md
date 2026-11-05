@@ -66,12 +66,15 @@ docker run --rm -p 127.0.0.1:8080:8080 ghcr.io/rayleeigh/build4fun:latest
 
 ## Documentation
 
+- [Code4Fun plan](docs/code4fun/plan.md): learning stages, workspace, prepared API,
+  and implementation sequence.
+
 - [Apprentice challenges](challenges/build/README.md): six practical labs with
   automatic saved-project checks at http://localhost:8080/challenges.
 - [Setup and user guide](apps/build4fun/README.md): environment settings, editor workflow,
   deployment, troubleshooting, and checks.
-- [Project purpose](docs/purpose.md): audience and learning approach.
-- [Implementation](docs/implementation.md): architecture, persistence,
+- [Project purpose](docs/build4fun/purpose.md): audience and learning approach.
+- [Implementation](docs/build4fun/implementation.md): architecture, persistence,
   validation, Docker execution, and current boundaries.
 - [Environment example](.env.example): settings to copy into a local `.env`.
 
