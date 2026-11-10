@@ -52,6 +52,23 @@ The lesson panel specifies the element IDs and behaviors checked at each stage.
 Checks accept different implementations; API checks change sample values to
 reject hardcoded responses. Regular previews always use the live API.
 
+## Editor indentation
+
+The starter HTML and editor use two-space indentation. Tab inserts spaces to the
+next two-column stop; select several lines to indent them together. Shift+Tab
+outdents the current or selected lines. Backspace in leading whitespace removes
+an indentation step.
+
+Enter preserves the current indentation and adds a level after an opening HTML
+tag or a JavaScript/CSS block delimiter. Between matching opening and closing
+tags or delimiters, it creates an indented blank line and places the closing part
+on the following line. HTML void elements such as meta and link do not add a level.
+Native undo is preserved where the browser supports undoable textarea insertion.
+
+Press Escape, then Tab (or Shift+Tab) to move keyboard focus outside the editor.
+Loading or saving a file does not reformat it; existing apprentice formatting is
+preserved. The corrected starter is used for new workspaces and explicit resets.
+
 ## Tutorial and completion feedback
 
 On the first workspace visit, the tutorial presents four course cards: HTML,

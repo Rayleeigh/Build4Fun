@@ -195,3 +195,16 @@ dialog pre { padding: 14px; border: 0; border-radius: 10px; background: #f5f5f7;
 @media(prefers-reduced-motion:reduce) {
   button, .topic-card strong, .progress-track > div { transition: none; }
 }
+
+/* Morph only the surface geometry; text keeps its final size and sharpness. */
+#tutorial-card { padding: 0; border: 0; background: transparent; box-shadow: none; max-height: none; overflow: visible; }
+#tutorial-surface { position: absolute; inset: 0; border: 1px solid #0000000d; border-radius: inherit; background: #fff; box-shadow: 0 24px 90px #00000026, 0 2px 8px #0000000a; transform-origin: top left; pointer-events: none; }
+#tutorial-content { position: relative; padding: 32px; max-height: calc(100dvh - 32px); overflow: auto; overscroll-behavior: contain; border-radius: inherit; }
+.anchored #tutorial-card { padding: 0; }
+.anchored #tutorial-content { padding: 24px; }
+#tutorial-topics { position: relative; isolation: isolate; }
+#topic-highlight { position: absolute; z-index: 0; background: #fff; border-radius: 10px; box-shadow: 0 1px 5px #00000012, 0 0 1px #0000000a; transform-origin: top left; pointer-events: none; }
+.topic-card { position: relative; z-index: 1; }
+.topic-card[aria-current=step] { background: transparent; box-shadow: none; }
+.topic-card[aria-current=step]:hover { background: #00000003; }
+@media(max-width:700px) { #tutorial-content { padding: 22px; } }

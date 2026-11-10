@@ -70,10 +70,19 @@ def main():
                 assert page.evaluate('''() => {
                     renderTour();
                     return document.getAnimations().some(animation =>
-                        animation.effect.target.id === 'tutorial-text' &&
-                        animation.effect.getTiming().duration <= 220);
+                        animation.effect.target.id === 'tutorial-surface' &&
+                        animation.effect.getTiming().duration <= 320);
                 }''')
                 assert page.locator('#example-preview h2').inner_text() == 'My reading list'
+                assert page.evaluate('''async () => {
+                    tourStep=2;renderTour();tourStep=3;renderTour();tourStep=1;renderTour();
+                    await Promise.all(tutorialAnimations.map(animation=>animation.finished));
+                    const surface=document.querySelector('#tutorial-surface').getBoundingClientRect();
+                    const card=document.querySelector('#tutorial-card').getBoundingClientRect();
+                    return Math.abs(surface.width-card.width)<1 && Math.abs(surface.height-card.height)<1 &&
+                           Math.abs(surface.x-card.x)<1 && Math.abs(surface.y-card.y)<1 &&
+                           document.querySelector('.topic-card[aria-current=step] strong').textContent==='HTML';
+                }''')
                 page.screenshot(path='/tmp/code4fun-course.png', full_page=True, animations='disabled')
                 page.set_viewport_size({'width':390,'height':844})
                 assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
@@ -82,7 +91,7 @@ def main():
                 page.emulate_media(reduced_motion='reduce')
                 page.locator('#tutorial-next').click()
                 assert page.locator('.topic-card[aria-current="step"] strong').inner_text() == 'CSS'
-                assert page.evaluate("() => !document.getAnimations().some(animation => ['tutorial-title','tutorial-text','tutorial-example'].includes(animation.effect.target.id))")
+                assert page.evaluate("() => !document.getAnimations().some(animation => ['tutorial-surface','tutorial-content','topic-highlight'].includes(animation.effect.target.id))")
                 page.emulate_media(reduced_motion='no-preference')
                 assert page.locator('#example-preview .demo-styled').count() == 1
                 page.locator('#tutorial-next').click()
@@ -157,6 +166,56 @@ def main():
                 assert page.locator('#preview').get_attribute('src') == preview_src
                 assert not page.locator('#mission-picker').evaluate('(el)=>el.open')
                 page.locator('#previous').click()
+                # Real keyboard editing: two-space stops, block edits, nesting, and undo.
+                editor=page.locator('#code')
+                editor.fill('<section></section>')
+                editor.evaluate('(el)=>el.setSelectionRange(9,9)')
+                editor.press('Enter')
+                assert editor.input_value() == '<section>\n  \n</section>'
+                editor.press('Tab')
+                assert editor.input_value() == '<section>\n    \n</section>'
+                editor.press('Shift+Tab')
+                assert editor.input_value() == '<section>\n  \n</section>'
+                editor.press('Backspace')
+                assert editor.input_value() == '<section>\n\n</section>'
+                editor.fill('  <section>')
+                editor.press('End')
+                editor.press('Enter')
+                assert editor.input_value() == '  <section>\n    '
+                editor.fill('    <meta charset="utf-8">')
+                editor.press('End')
+                editor.press('Enter')
+                assert editor.input_value().endswith('\n    ')
+                editor.fill('a\nb\n')
+                editor.select_text()
+                editor.press('Tab')
+                assert editor.input_value() == '  a\n  b\n'
+                editor.press('Shift+Tab')
+                assert editor.input_value() == 'a\nb\n'
+                editor.fill('a')
+                editor.press('End')
+                editor.press('Tab')
+                assert editor.input_value() == 'a '
+                editor.press('Escape')
+                editor.press('Tab')
+                assert not editor.evaluate('(el)=>el===document.activeElement')
+                page.get_by_role('tab', name='style.css', exact=True).click()
+                css_original=store.read()['files']['style.css']
+                editor.fill('body {}')
+                editor.evaluate('(el)=>el.setSelectionRange(6,6)')
+                editor.press('Enter')
+                assert editor.input_value() == 'body {\n  \n}'
+                editor.press('ControlOrMeta+z')
+                assert editor.input_value() == 'body {}'
+                editor.fill(css_original)
+                page.get_by_role('tab', name='script.js', exact=True).click()
+                script_original=store.read()['files']['script.js']
+                editor.fill('function greet() {}')
+                editor.evaluate('(el)=>el.setSelectionRange(18,18)')
+                editor.press('Enter')
+                assert editor.input_value() == 'function greet() {\n  \n}'
+                editor.fill(script_original)
+                page.get_by_role('tab', name='index.html', exact=True).click()
                 # Reference has an accessible modal and a recoverable offline state.
                 page.route('**/code4fun/api/reference', lambda route: route.fulfill(status=502, content_type='application/json', body='{"error":"API temporarily unavailable"}'))
                 page.locator('#api-link').click()

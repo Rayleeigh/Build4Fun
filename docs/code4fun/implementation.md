@@ -50,10 +50,13 @@ source files.
 The interface uses system typography, neutral surfaces, green action controls,
 and a compact topic selector. Code4Fun uses `#00C400` as its identifying accent,
 with darker green foregrounds for readable labels and button text. Topic buttons stay mounted between tutorial steps
-so their selected state can transition smoothly. Tutorial headings, explanations,
-and examples use a 180 ms fade and small vertical movement. Both these animations
+so their selected state can transition smoothly. A shared highlight moves between
+topic selections. The tutorial surface morphs from its currently displayed bounds
+to the next step's size and position over 280 ms; its content uses a short fade
+and small movement without stretching text. Rapid navigation cancels and rebases
+motion from the visible surface rather than finishing an outdated step. Animation
 and control transitions respect `prefers-reduced-motion`; enabling that preference
-also cancels an in-progress tutorial animation.
+also cancels in-progress tutorial animations.
 
 Desktop panels share a bounded height and matching headers; flex children scroll
 internally to prevent expanded hints or results from changing the outer frame.
@@ -67,6 +70,21 @@ fields, examples, and measurement notes as text, with retry feedback when the AP
 is unavailable. Raw `/api/info` remains available through the preview proxy.
 First-time mission completion triggers a six-second toast with an animated timer;
 hover and keyboard focus pause it, and historical completion suppresses repeats.
+
+## Editor behavior
+
+The plain textarea retains literal whitespace from saved files. Its keyboard
+handler implements two-space tab stops, selected-line indent/outdent, leading
+whitespace backspace, and context-aware newline indentation. Newlines use simple
+opening-tag and delimiter heuristics, excluding HTML void elements; this is not a
+source formatter or syntax parser. The starter HTML follows the same two-space
+nesting convention.
+
+Keyboard edits use undoable native text insertion where available, with a
+setRangeText fallback that dispatches the normal input event. Drafts, saved files,
+and line numbers therefore receive keyboard-generated edits through the same
+path as ordinary typing. Read-only state and IME composition are respected.
+Escape followed by Tab releases keyboard focus from the editor.
 
 ## Preview and checking boundary
 
