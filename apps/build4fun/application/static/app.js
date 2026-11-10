@@ -136,6 +136,7 @@ function updateStatus() {
   $('save-status').textContent = state.saving ? 'Saving…' : dirty() ? 'Unsaved changes' : 'All changes saved';
   $('save').disabled = !state.ready || state.saving || state.deleting || !dirty(); $('undo').disabled = !state.history.length;
   const displayName=state.view==='projects'?'Projects':!state.activeProject?'No project selected':state.projects.find(p=>p.id===state.activeProject)?.name||projectName();
+  document.querySelector('.project-identity').hidden=!state.activeProject||state.view==='projects';
   $('sidebar-project').textContent = displayName; $('toolbar-project').textContent = displayName;
   const count = state.project?.children.filter(n => n.type === 'service').length || 0;
   $('workspace-count').textContent = `${count} service${count === 1 ? '' : 's'}`;
@@ -462,7 +463,7 @@ function renderBuilder(content) {
 }
 function blockPalette() {
   const palette=el('section',undefined,'block-palette');palette.setAttribute('aria-label','Block palette');
-  palette.append(el('p','ADD BLOCKS','nav-label'));
+  palette.append(el('p','Blocks','nav-label'));
   let parent=find(state.selected)||state.project;
   while(parent&&!(definition(parent).children||[]).length)parent=parentOf(parent);
   parent=parent||state.project;
@@ -486,7 +487,7 @@ function blockPalette() {
   return palette;
 }
 function renderNavigation() {
-  const nav=$('workspace-navigation');nav.replaceChildren(el('p','WORKSPACE','nav-label'));
+  const nav=$('workspace-navigation');nav.replaceChildren(el('p','Workspace','nav-label'));
   const challenges=el('a','Apprentice challenges','nav-row');challenges.href='/challenges';challenges.target='_blank';challenges.rel='noopener';challenges.append(el('span','↗'));nav.append(challenges);
   const projectRow=el('div',undefined,'projects-navigation');
   const projects=button('Projects',()=>{state.projectsExpanded=!state.projectsExpanded;renderNavigation();$('projects-toggle').focus();},'tertiary',state.projectsExpanded?'down':'chevron');projects.id='projects-toggle';projects.className='nav-row';projects.setAttribute('aria-expanded',String(state.projectsExpanded));projects.setAttribute('aria-controls','project-tree');
@@ -528,8 +529,9 @@ function renderHeading() {
     if(state.validated===true){const badge=el('span',undefined,'validation-badge');badge.append(icon('check'),el('span','Checked'));actions.append(badge);}
     if(state.activeProject==='legacy'&&!state.project.children.length&&!state.dirty)actions.append(button('Open saved project',guarded(openSavedProject),'secondary','folder'));
     actions.append(button('Validate',guarded(validateProject),'secondary','check'));
-    actions.append(button('Network map',()=>navigate('map'),'secondary','network'));
-    actions.append(button('Environment',()=>navigate('runtime'),'secondary','cube'));
+    const views=el('div',undefined,'view-controls');views.setAttribute('role','group');views.setAttribute('aria-label','Project views');
+    views.append(button('Network map',()=>navigate('map'),'secondary','network'),button('Environment',()=>navigate('runtime'),'secondary','cube'));
+    actions.append(views);
     const deploy=button('Deploy',guarded(reviewDeployment),'primary','cube');deploy.disabled=state.runtimeBusy||state.saving;actions.append(deploy);
     if(state.view==='build'){
       const toggle=button(state.previewVisible?'Hide YAML':'Show YAML',()=>{
@@ -537,6 +539,7 @@ function renderHeading() {
       },'secondary','code');toggle.classList.add('desktop-preview-toggle');toggle.setAttribute('aria-pressed',String(state.previewVisible));actions.append(toggle);
       const yaml=button('YAML',()=>navigate('compose'),'secondary','code');yaml.classList.add('mobile-preview-toggle');actions.append(yaml);
     }else actions.append(button('Blocks',()=>navigate('build'),'secondary','build'));
+    actions.append(deploy);
   }else if(state.view==='projects')actions.append(button('New project',newProject,'primary','plus'));
   else if(state.view==='runtime')actions.append(button('Back to build',()=>navigate('build'),'secondary','build'));
   else if(state.view==='files')actions.append(button('New file',()=>createFile(false),'primary','plus'));
@@ -939,7 +942,7 @@ async function saveProjectFromOverview(identity) {
 }
 function renderProjects(content) {
   const welcome=el('div',undefined,'landing-intro');
-  welcome.append(el('h2','Your next environment starts here.'),el('p','Create a Compose project, build it block by block, and keep its configuration files together.'));
+  welcome.append(el('p','Create and manage your Compose environments. Each project keeps its services, configuration, and files together.'));
   content.append(welcome);
   if(!state.projects.length){
     content.append(emptyState('Create your first project','Start with an empty project. You choose every service, image, and configuration block.',button('Create project',newProject,'primary','plus'),'build'));return;

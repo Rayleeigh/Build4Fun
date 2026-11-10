@@ -12,9 +12,9 @@ from http.server import ThreadingHTTPServer
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'workspace'))
-from server import Store, make_handler
+from server import Store, make_handler, LEGACY_STARTER
 from checks import check
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import sync_playwright, expect
 
 spec = importlib.util.spec_from_file_location('prepared_api', ROOT / 'api' / 'server.py')
 api = importlib.util.module_from_spec(spec)
@@ -57,8 +57,17 @@ def main():
             with sync_playwright() as playwright:
                 browser = playwright.chromium.launch()
                 page = browser.new_page(viewport={'width': 1512, 'height': 1100})
+                page.add_init_script('''(() => {
+                    if (!sessionStorage.getItem('legacy-draft-seeded')) {
+                        localStorage.setItem('code4fun:draft:' + location.origin, JSON.stringify(%s));
+                        sessionStorage.setItem('legacy-draft-seeded','yes');
+                    }
+                })()''' % json.dumps({'files': LEGACY_STARTER, 'stage': 0, 'revision': 'obsolete-starter-revision'}))
                 page.goto(origin)
                 page.wait_for_function('() => document.querySelector("#save-status").textContent==="All changes saved"')
+                assert not page.locator('#recovery').is_visible()
+                assert '\n  <head>\n    <meta' in page.locator('#code').input_value()
+                page.frame_locator('#preview').get_by_text('Your dashboard starts here.', exact=False).wait_for()
                 # First-run tutorial has real actions and is persisted per workspace.
                 page.locator('#tutorial-dialog').wait_for(state='visible')
                 assert 'This is the course' in page.locator('#tutorial-title').inner_text()
@@ -166,22 +175,92 @@ def main():
                 assert page.locator('#preview').get_attribute('src') == preview_src
                 assert not page.locator('#mission-picker').evaluate('(el)=>el.open')
                 page.locator('#previous').click()
-                # Real keyboard editing: two-space stops, block edits, nesting, and undo.
+                # Autosave persists edits without blocking typing, then survives reload.
+                page.locator('#code').fill('<h2>Autosaved dashboard</h2>')
+                page.wait_for_function('() => document.querySelector("#save-status").textContent==="All changes saved"')
+                assert store.read()['files']['index.html']=='<h2>Autosaved dashboard</h2>'
+                page.reload()
+                page.wait_for_function('() => !document.querySelector("#code").readOnly')
+                assert page.locator('#code').input_value()=='<h2>Autosaved dashboard</h2>'
+                assert not page.locator('#recovery').is_visible()
+                # Edits made during a slow save must be retained and saved on the new revision.
+                held_saves=[]
+                def hold_save(route):
+                    if route.request.post_data_json['files']['index.html']=='<h2>First save</h2>':
+                        held_saves.append(route)
+                    else:
+                        route.continue_()
+                page.route('**/code4fun/api/save',hold_save)
+                page.locator('#code').fill('<h2>First save</h2>')
+                page.wait_for_timeout(1000)
+                assert len(held_saves)==1
+                assert page.locator('#code').evaluate('(el)=>!el.readOnly')
+                page.locator('#code').fill('<h2>New edits during save</h2>')
+                held_saves[0].continue_()
+                page.wait_for_function('() => document.querySelector("#save-status").textContent==="All changes saved"')
+                assert store.read()['files']['index.html']=='<h2>New edits during save</h2>'
+                page.unroute('**/code4fun/api/save',hold_save)
+                # Failed autosaves retain the draft and can be retried explicitly.
+                page.route('**/code4fun/api/save',lambda route: route.fulfill(status=503,content_type='application/json',body='{"error":"Save service temporarily unavailable"}'))
+                page.locator('#code').fill('<h2>Retry this save</h2>')
+                page.get_by_text('Save service temporarily unavailable',exact=True).wait_for()
+                assert 'Not saved' in page.locator('#save-status').inner_text()
+                assert page.evaluate("JSON.parse(localStorage.getItem('code4fun:draft:'+location.origin)).files['index.html']")=='<h2>Retry this save</h2>'
+                page.unroute('**/code4fun/api/save')
+                page.get_by_role('button',name='Save project',exact=True).click()
+                page.get_by_text('Project saved.',exact=True).wait_for()
+                assert store.read()['files']['index.html']=='<h2>Retry this save</h2>'
+                # The supplied HTML example renders without pressing Run or saving.
+                live_html='<!DOCTYPE html> <html> <head><title>Page Title</title></head><body><h2>Welcome To GFG</h2><p>Default code has been loaded into the Editor.</p></body></html>'
+                page.locator('#code').fill(live_html)
+                page.frame_locator('#preview').get_by_role('heading',name='Welcome To GFG').wait_for()
+                assert store.read()['files']['index.html']!=live_html
+                # A late response for an older edit cannot overwrite the latest preview.
+                held=[]
+                def hold_older(route):
+                    if route.request.post_data_json['files']['index.html']=='<h2>Older preview</h2>':
+                        held.append(route)
+                    else:
+                        route.continue_()
+                page.route('**/code4fun/api/run',hold_older)
+                page.locator('#code').fill('<h2>Older preview</h2>')
+                page.wait_for_timeout(350)
+                assert len(held)==1
+                page.locator('#code').fill('<h2>Newest preview</h2>')
+                page.frame_locator('#preview').get_by_role('heading',name='Newest preview').wait_for()
+                token=store.snapshot(held[0].request.post_data_json['files'])
+                held[0].fulfill(status=200,content_type='application/json',body=json.dumps({'path':f'/preview/{token}/index.html'}))
+                page.wait_for_timeout(100)
+                assert page.frame_locator('#preview').get_by_role('heading',name='Newest preview').is_visible()
+                page.unroute('**/code4fun/api/run',hold_older)
+                # CSS and JavaScript files update the live page as well.
+                page.locator('#code').fill('<html><head><link rel="stylesheet" href="style.css"><script src="script.js" defer></script></head><body><h2>Live files</h2></body></html>')
+                page.frame_locator('#preview').get_by_role('heading',name='Live files').wait_for()
+                page.get_by_role('tab',name='style.css',exact=True).click()
+                page.locator('#code').fill('body { background-color: rgb(210, 240, 210); }')
+                expect(page.frame_locator('#preview').locator('body')).to_have_css('background-color','rgb(210, 240, 210)')
+                page.locator('#code').fill(store.read()['files']['style.css'])
+                page.get_by_role('tab',name='script.js',exact=True).click()
+                page.locator('#code').fill('document.querySelector("h2").textContent="JavaScript is live";')
+                page.frame_locator('#preview').get_by_role('heading',name='JavaScript is live').wait_for()
+                page.locator('#code').fill(store.read()['files']['script.js'])
+                page.get_by_role('tab',name='index.html',exact=True).click()
+                # Real keyboard editing: literal tabs, block outdent, focus scoping, and undo.
                 editor=page.locator('#code')
                 editor.fill('<section></section>')
                 editor.evaluate('(el)=>el.setSelectionRange(9,9)')
                 editor.press('Enter')
-                assert editor.input_value() == '<section>\n  \n</section>'
+                assert editor.input_value() == '<section>\n\t\n</section>'
                 editor.press('Tab')
-                assert editor.input_value() == '<section>\n    \n</section>'
+                assert editor.input_value() == '<section>\n\t\t\n</section>'
                 editor.press('Shift+Tab')
-                assert editor.input_value() == '<section>\n  \n</section>'
+                assert editor.input_value() == '<section>\n\t\n</section>'
                 editor.press('Backspace')
                 assert editor.input_value() == '<section>\n\n</section>'
                 editor.fill('  <section>')
                 editor.press('End')
                 editor.press('Enter')
-                assert editor.input_value() == '  <section>\n    '
+                assert editor.input_value() == '  <section>\n  \t'
                 editor.fill('    <meta charset="utf-8">')
                 editor.press('End')
                 editor.press('Enter')
@@ -189,22 +268,42 @@ def main():
                 editor.fill('a\nb\n')
                 editor.select_text()
                 editor.press('Tab')
-                assert editor.input_value() == '  a\n  b\n'
+                assert editor.input_value() == '\ta\n\tb\n'
                 editor.press('Shift+Tab')
                 assert editor.input_value() == 'a\nb\n'
+                # Shift+Tab handles old space-indented files and keeps focus in the editor.
+                editor.fill('  one\n    two')
+                editor.select_text()
+                editor.press('Shift+Tab')
+                assert editor.input_value() == 'one\n  two'
+                assert editor.evaluate('(el)=>el===document.activeElement')
+                editor.fill('\tone')
+                editor.evaluate('(el)=>el.setSelectionRange(1,1)')
+                editor.press('Shift+Tab')
+                assert editor.input_value() == 'one'
+                assert editor.evaluate('(el)=>el.selectionStart===0&&el===document.activeElement')
                 editor.fill('a')
                 editor.press('End')
                 editor.press('Tab')
-                assert editor.input_value() == 'a '
+                assert editor.input_value() == 'a\t'
                 editor.press('Escape')
                 editor.press('Tab')
                 assert not editor.evaluate('(el)=>el===document.activeElement')
+                # Tab outside the editor navigates normally and never changes source.
+                source=editor.input_value()
+                page.locator('#save').focus()
+                page.keyboard.press('Tab')
+                assert page.locator('#run').evaluate('(el)=>el===document.activeElement')
+                page.keyboard.press('Shift+Tab')
+                assert page.locator('#save').evaluate('(el)=>el===document.activeElement')
+                assert editor.input_value()==source
+
                 page.get_by_role('tab', name='style.css', exact=True).click()
                 css_original=store.read()['files']['style.css']
                 editor.fill('body {}')
                 editor.evaluate('(el)=>el.setSelectionRange(6,6)')
                 editor.press('Enter')
-                assert editor.input_value() == 'body {\n  \n}'
+                assert editor.input_value() == 'body {\n\t\n}'
                 editor.press('ControlOrMeta+z')
                 assert editor.input_value() == 'body {}'
                 editor.fill(css_original)
@@ -213,7 +312,7 @@ def main():
                 editor.fill('function greet() {}')
                 editor.evaluate('(el)=>el.setSelectionRange(18,18)')
                 editor.press('Enter')
-                assert editor.input_value() == 'function greet() {\n  \n}'
+                assert editor.input_value() == 'function greet() {\n\t\n}'
                 editor.fill(script_original)
                 page.get_by_role('tab', name='index.html', exact=True).click()
                 # Reference has an accessible modal and a recoverable offline state.
@@ -249,6 +348,7 @@ def main():
                 page.reload()
                 page.get_by_role('button', name='Recover draft').click()
                 assert 'A recovered draft' in page.locator('#code').input_value()
+                page.frame_locator('#preview').get_by_role('heading',name='A recovered draft').wait_for()
                 page.get_by_role('button', name='Save project', exact=True).click()
                 page.get_by_text('Project saved.', exact=True).wait_for()
                 page.get_by_role('tab', name='style.css', exact=True).click()
@@ -263,11 +363,15 @@ def main():
                 page.screenshot(path='/tmp/code4fun-mobile.png', full_page=True, animations='disabled')
                 assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
                 # An old browser draft must not silently overwrite a newer save.
+                page.locator('#code').fill('/* Draft must survive a conflicting save */')
                 saved = store.read()
                 newer_files = {**saved['files'], 'index.html': '<h1>A newer save</h1>'}
                 store.save({**saved, 'files': newer_files})
                 page.reload()
                 page.get_by_role('button', name='Recover draft').click()
+                page.wait_for_timeout(1000)
+                assert store.read()['files']['index.html']=='<h1>A newer save</h1>'
+                assert 'Conflict' in page.locator('#save-status').inner_text()
                 page.get_by_role('button', name='Save project', exact=True).click()
                 page.get_by_text('A newer save exists.', exact=False).wait_for()
                 assert store.read()['files']['index.html'] == '<h1>A newer save</h1>'
@@ -277,6 +381,7 @@ def main():
                 page.get_by_role('button', name='Reset entire project').click()
                 page.get_by_text('Project reset to its starting point.', exact=True).wait_for()
                 assert store.read()['files'] == store.starter()
+                page.frame_locator('#preview').get_by_text('Your dashboard starts here.', exact=False).wait_for()
                 assert not store.read()['completed']
                 browser.close()
 

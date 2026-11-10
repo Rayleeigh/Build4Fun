@@ -7,21 +7,32 @@ function notice(message, error = false) { $('notice').textContent = message; $('
 async function request(path, data) {
   const response = await fetch('/code4fun/api/' + path, data === undefined ? {} : {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)});
   const body = await response.json();
-  if (!response.ok) throw new Error(body.error || `Request failed (${response.status}).`);
+  if (!response.ok) {const error=new Error(body.error || `Request failed (${response.status}).`);error.status=response.status;throw error;}
   return body;
 }
+let autosaveTimer, saveInFlight=null, changeNumber=0, savedChangeNumber=0, autosaveBlocked=false, saveFailure='';
 function payload() { return {files, stage, revision:state.revision}; }
-function cacheDraft() {
+function storeDraft() {
   try { localStorage.setItem(draftKey, JSON.stringify(payload())); }
   catch (_) { notice('Browser draft storage is unavailable. Use Save project or download a backup.', true); }
-  $('save-status').textContent = 'Unsaved changes';
+}
+function cacheDraft() {
+  changeNumber++;
+  storeDraft();
+  $('save-status').textContent = autosaveBlocked ? 'Conflict · download backup' : 'Unsaved changes';
+  scheduleAutosave();
+}
+function scheduleAutosave() {
+  clearTimeout(autosaveTimer);
+  if(!state || busy || pendingDraft || autosaveBlocked || changeNumber===savedChangeNumber)return;
+  autosaveTimer=setTimeout(()=>save(true).catch(()=>{}),800);
 }
 function clearDraft() { try { localStorage.removeItem(draftKey); } catch (_) {} }
 function setBusy(value) {
   busy = value;
   document.querySelectorAll('.workspace button, #reset, #recover, #discard').forEach(button => button.disabled = value || (!!pendingDraft && !['recover','discard'].includes(button.id)));
   $('code').readOnly = value || !!pendingDraft;
-  if (!value && !pendingDraft) { $('previous').disabled = stage === 0; $('next').disabled = stage === 5; }
+  if (!value && !pendingDraft) { $('previous').disabled = stage === 0; $('next').disabled = stage === 5; scheduleAutosave(); }
 }
 function lines() { $('line-numbers').textContent = Array.from({length:$('code').value.split('\n').length}, (_, i) => i+1).join('\n'); }
 function selectFile(name) {
@@ -63,22 +74,76 @@ function renderLesson() {
 }
 function changeStage(index) { if (busy || pendingDraft) return; stage=index; renderLesson(); $('mission-picker').open=false; cacheDraft(); }
 function previewOrigin() { return `http://${location.hostname}:${previewPort}`; }
+let previewTimer, previewGeneration=0, livePreviewError='';
 async function run() {
-  const result = await request('run', {files});
-  $('preview').src = previewOrigin() + result.path;
+  clearTimeout(previewTimer);
+  const generation=++previewGeneration;
+  try {
+    const result=await request('run',{files});
+    // A slow response must never replace newer edits with an older snapshot.
+    if(generation!==previewGeneration)return;
+    $('preview').src=previewOrigin()+result.path;
+    if(livePreviewError && $('notice').textContent===livePreviewError)notice('');
+    livePreviewError='';
+  } catch(error) {
+    if(generation===previewGeneration)throw error;
+  }
+}
+function schedulePreview(delay=200) {
+  clearTimeout(previewTimer);
+  previewGeneration++;
+  previewTimer=setTimeout(()=>run().catch(error=>{
+    livePreviewError='Could not update preview: '+error.message;
+    notice(livePreviewError,true);
+  }),delay);
 }
 async function perform(action) {
   if (busy || pendingDraft) return;
   setBusy(true); notice('');
-  try { await action(); } catch (error) { notice(error.message, true); }
+  try {clearTimeout(autosaveTimer);if(saveInFlight)await saveInFlight;await action();} catch (error) { notice(error.message, true); }
   finally { setBusy(false); }
 }
-async function save() {
-  state = await request('save', payload()); clearDraft(); $('save-status').textContent = 'All changes saved'; notice('Project saved.');
+async function persistOnce() {
+  const version=changeNumber;
+  const snapshot={files:{...files},stage,revision:state.revision};
+  $('save-status').textContent='Saving…';
+  saveInFlight=(async()=>{
+    try {
+      state=await request('save',snapshot);
+      savedChangeNumber=version;
+      autosaveBlocked=false;
+      if(saveFailure && $('notice').textContent===saveFailure)notice('');
+      saveFailure='';
+      if(changeNumber===version) {
+        clearDraft();$('save-status').textContent='All changes saved';
+      } else {
+        // Rebase newer unsaved edits onto the revision just saved, without replacing them.
+        storeDraft();$('save-status').textContent='Unsaved changes';
+      }
+    } catch(error) {
+      autosaveBlocked=error.status===409;
+      saveFailure=error.message;
+      $('save-status').textContent=autosaveBlocked?'Conflict · download backup':'Not saved · retry Save';
+      notice(error.message,true);
+      throw error;
+    } finally {saveInFlight=null;}
+  })();
+  return saveInFlight;
 }
-$('code').addEventListener('input', () => {files[activeFile]=$('code').value;lines();cacheDraft();$('check-caption').textContent='Code changed. Run checks again.';});
+async function save(automatic=false) {
+  clearTimeout(autosaveTimer);
+  if(automatic && (busy || pendingDraft || autosaveBlocked))return;
+  if(saveInFlight)await saveInFlight;
+  if(changeNumber!==savedChangeNumber)await persistOnce();
+  if(!automatic) {
+    while(changeNumber!==savedChangeNumber)await persistOnce();
+    notice('Project saved.');
+  }
+  scheduleAutosave();
+}
+$('code').addEventListener('input', () => {files[activeFile]=$('code').value;lines();cacheDraft();$('check-caption').textContent='Code changed. Run checks again.';schedulePreview();});
 $('code').addEventListener('scroll', () => {$('line-numbers').scrollTop=$('code').scrollTop;});
-const indentUnit = '  ';
+const indentUnit = '\t';
 let releaseEditorTab = false;
 function editCode(from, to, replacement, selectionStart, selectionEnd=selectionStart, direction='none') {
   const editor=$('code');
@@ -142,7 +207,7 @@ function newlineIndentation() {
 }
 $('code').addEventListener('keydown', event => {
   const editor=$('code');
-  if(editor.readOnly || event.isComposing || event.ctrlKey || event.metaKey || event.altKey)return;
+  if(document.activeElement!==editor || event.target!==editor || editor.readOnly || event.isComposing || event.ctrlKey || event.metaKey || event.altKey)return;
   if(event.key==='Escape') {releaseEditorTab=true;return;}
   if(event.key==='Tab' && releaseEditorTab) {releaseEditorTab=false;return;}
   releaseEditorTab=false;
@@ -150,11 +215,7 @@ $('code').addEventListener('keydown', event => {
     event.preventDefault();
     const start=editor.selectionStart,end=editor.selectionEnd;
     if(event.shiftKey || start!==end) {indentLines(event.shiftKey);return;}
-    const first=(start===0?0:editor.value.lastIndexOf('\n',start-1)+1);
-    let column=0;
-    for(const char of editor.value.slice(first,start))column+=char==='\t'?2-column%2:1;
-    const spaces=' '.repeat(2-column%2);
-    editCode(start,end,spaces,start+spaces.length);
+    editCode(start,end,indentUnit,start+indentUnit.length);
   } else if(event.key==='Enter') {
     event.preventDefault();newlineIndentation();
   } else if(event.key==='Backspace' && editor.selectionStart===editor.selectionEnd) {
@@ -169,16 +230,16 @@ $('code').addEventListener('keydown', event => {
   }
 });
 $('code').addEventListener('blur',()=>{releaseEditorTab=false;});
-document.addEventListener('keydown', event => {if((event.ctrlKey||event.metaKey)&&event.key==='s'){event.preventDefault();if(state) perform(save);}});
-$('save').onclick = () => perform(save);
+document.addEventListener('keydown', event => {if((event.ctrlKey||event.metaKey)&&event.key==='s'){event.preventDefault();if(state) perform(()=>save());}});
+$('save').onclick = () => perform(()=>save());
 $('run').onclick = $('rerun').onclick = () => perform(async () => {await run();notice('Preview updated from your current edits.');});
 $('previous').onclick=()=>changeStage(Math.max(0,stage-1)); $('next').onclick=()=>changeStage(Math.min(5,stage+1));
 $('check').onclick=()=>perform(async()=>{
   $('check-caption').textContent='Saving and testing your dashboard…'; notice('Checking your work. The final stage can take up to a minute.');
   const previouslyCompleted = !!state.completed[stage];
   const result=await request('check',payload()); state=result.state;
-  if(result.current) {clearDraft();$('save-status').textContent='All changes saved';}
-  else {state.revision=result.checked_revision;cacheDraft();$('save-status').textContent='Conflict: newer save exists';}
+  if(result.current) {savedChangeNumber=changeNumber;autosaveBlocked=false;saveFailure='';clearDraft();$('save-status').textContent='All changes saved';}
+  else {state.revision=result.checked_revision;autosaveBlocked=true;cacheDraft();$('save-status').textContent='Conflict: newer save exists';}
   renderLesson();
   $('results').replaceChildren(...result.results.map(check=>{const li=document.createElement('li');li.className=check.passed?'pass':'fail';li.textContent=`${check.passed?'✓':'○'} ${check.label}`;if(!check.passed){const detail=document.createElement('small');detail.textContent=check.message;li.append(detail);}return li;}));
   const passed=result.results.every(item=>item.passed);
@@ -192,7 +253,7 @@ $('check').onclick=()=>perform(async()=>{
 });
 $('reset').onclick=()=>{
   if(!confirm('Reset the entire dashboard? This replaces all three files with the original starter files and clears all six stages of progress. Download a backup first if needed.'))return;
-  perform(async()=>{state=await request('reset',{revision:state.revision});files={...state.files};stage=0;clearDraft();$('recovery').hidden=true;renderLesson();selectFile(activeFile);await run();$('save-status').textContent='All changes saved';notice('Project reset to its starting point.');});
+  perform(async()=>{state=await request('reset',{revision:state.revision});files={...state.files};stage=0;changeNumber++;savedChangeNumber=changeNumber;autosaveBlocked=false;saveFailure='';clearDraft();$('recovery').hidden=true;renderLesson();selectFile(activeFile);await run();$('save-status').textContent='All changes saved';notice('Project reset to its starting point.');});
 };
 $('download').onclick=()=>{
   const link=document.createElement('a');link.href=URL.createObjectURL(new Blob([JSON.stringify({files,stage},null,2)],{type:'application/json'}));link.download='my-server-dashboard.json';link.click();setTimeout(()=>URL.revokeObjectURL(link.href),1000);
@@ -200,8 +261,9 @@ $('download').onclick=()=>{
 $('recover').onclick=()=>{
   files={...pendingDraft.files};stage=pendingDraft.stage;
   // Preserve the original revision: recovering an old draft must not bypass conflicts.
+  autosaveBlocked=pendingDraft.revision!==state.revision;
   state.revision=pendingDraft.revision;
-  selectFile(activeFile);renderLesson();$('recovery').hidden=true;pendingDraft=null;cacheDraft();notice('Draft recovered. If it is older than the saved version, download a backup before reloading.');setBusy(false);maybeTutorial();
+  selectFile(activeFile);renderLesson();$('recovery').hidden=true;pendingDraft=null;cacheDraft();schedulePreview(0);notice('Draft recovered. If it is older than the saved version, download a backup before reloading.');setBusy(false);maybeTutorial();
 };
 $('discard').onclick=()=>{clearDraft();$('recovery').hidden=true;pendingDraft=null;setBusy(false);maybeTutorial();};
 
@@ -324,8 +386,8 @@ const tourSteps=[
   ...courseTopics.map((topic,index)=>({title:topic.title,text:topic.text,topic:index})),
   {title:'Choose a mission',text:'Open Missions here to choose your task. Only these instructions change; your files and preview stay as they are. The help section includes examples you can adapt.',target:'mission-picker'},
   {title:'Work in your files',text:'Use these tabs to switch between HTML, CSS, and JavaScript. They all belong to the same project. Try opening your stylesheet, then return to HTML when you are ready.',target:'files',action:'Open style.css',try:()=>selectFile('style.css')},
-  {title:'Run your website',text:'Run preview shows your current edits in the Preview panel. You can try your buttons and see what your code does. Running does not save your files.',target:'run',action:'Run preview',try:()=>run()},
-  {title:'Save your work',text:'Save project keeps all three files and your selected mission for next time. You can also press Ctrl+S or ⌘S. The label at the top of the editor tells you whether you have unsaved changes.',target:'save'},
+  {title:'Run your website',text:'The preview updates automatically as you edit. Run preview refreshes it immediately when you need a fresh start. You can try your buttons in the Preview panel. Your changes also autosave after a short pause.',target:'run',action:'Run preview',try:()=>run()},
+  {title:'Save your work',text:'Your files and selected mission autosave after a short pause. The editor label shows Saving… and All changes saved. Save project or Ctrl+S / ⌘S saves immediately. Keep a backup if a conflict is reported.',target:'save'},
   {title:'Check the current mission',text:'Check my work saves your project and tests the task requirements. Feedback shows what works and what still needs attention. Passing a mission records your progress; you can keep refining the same project.',target:'check'},
   {title:'Keep the API reference close',text:'When you reach the API missions, use this reference for endpoints, field descriptions, and request examples. You can replay this tutorial at any time with Tutorial.',target:'api-link',action:'Open API reference',try:openReference}
 ];
@@ -484,7 +546,14 @@ async function boot() {
     for (const name of Object.keys(files)) {const button=document.createElement('button');button.textContent=name;button.dataset.file=name;button.setAttribute('role','tab');button.onclick=()=>selectFile(name);button.addEventListener('keydown',event=>{if(['ArrowLeft','ArrowRight'].includes(event.key)){event.preventDefault();const list=Object.keys(files);const next=list[(list.indexOf(activeFile)+(event.key==='ArrowRight'?1:2))%3];selectFile(next);[...$('files').children].find(el=>el.dataset.file===next).focus();}});$('files').append(button);}
     selectFile(activeFile);renderLesson();$('save-status').textContent='All changes saved';
     try {
-      const draft=JSON.parse(localStorage.getItem(draftKey));
+      let draft=JSON.parse(localStorage.getItem(draftKey));
+      // An old empty starter draft is not apprentice work and must not undo the upgrade.
+      const obsolete=result.obsolete_starters||[];
+      if(draft?.stage===0 && draft.files && obsolete.some(starter=>
+         Object.keys(draft.files).length===Object.keys(starter).length &&
+         Object.entries(starter).every(([name,contents])=>draft.files[name]===contents))) {
+        clearDraft();draft=null;
+      }
       if(draft && draft.files && Object.keys(draft.files).sort().join()===Object.keys(files).sort().join() && Object.values(draft.files).every(v=>typeof v==='string') && Number.isInteger(draft.stage) && draft.stage>=0 && draft.stage<6 && typeof draft.revision==='string' && (JSON.stringify(draft.files)!==JSON.stringify(files)||draft.stage!==stage)) {
         pendingDraft=draft;$('recovery').hidden=false;$('recovery-detail').textContent=draft.revision===state.revision?'Recover your unsaved edits or keep the saved project.':'This draft is based on an older save. Recovery preserves that conflict; download it before reloading.';
       }

@@ -30,6 +30,15 @@ file and assign a new revision. Stale revisions fail with a conflict rather than
 overwrite another save. This supports one server process per workspace, not
 multiple replicas. Files are limited to three known names and 128 KiB each.
 
+Edits and mission changes schedule autosave after 800 ms of inactivity. Saves
+are serialized; manual Save, Check, and Reset wait for an in-flight save before
+performing their own operation. Successful saves update the revision without
+replacing the editable buffer. Edits made during a request remain dirty and their
+browser draft is rebased onto that returned revision before the next save.
+Conflicts pause autosave; other errors retain the draft and allow an explicit
+retry or another attempt on a later edit. Save status becomes clean only when
+the returned snapshot includes all current edits.
+
 Browser drafts include the saved revision. Recovery never rebases an old draft
 silently. Completion stores the timestamp and hash of the files that passed;
 badges represent historical milestones. Checks save current edits first and
@@ -74,11 +83,18 @@ hover and keyboard focus pause it, and historical completion suppresses repeats.
 ## Editor behavior
 
 The plain textarea retains literal whitespace from saved files. Its keyboard
-handler implements two-space tab stops, selected-line indent/outdent, leading
+handler inserts literal tabs (displayed at two-column stops), selected-line indent/outdent, leading
 whitespace backspace, and context-aware newline indentation. Newlines use simple
 opening-tag and delimiter heuristics, excluding HTML void elements; this is not a
-source formatter or syntax parser. The starter HTML follows the same two-space
-nesting convention.
+source formatter or syntax parser. Keyboard interception requires the textarea
+itself to be focused and editable. Tab indents; Shift+Tab removes a leading tab
+or up to two spaces. Browser focus navigation elsewhere is not intercepted. The starter HTML follows the same two-space
+nesting convention. The current starter includes a visible placeholder in its body; a comment-only
+body renders blank in the browser. Startup upgrades an exact match for either
+older three-file starter only at stage zero with no completion history, assigning a fresh revision
+while preserving preferences. The project response provides known obsolete starter versions
+only when the saved project is an untouched current starter, allowing the browser
+to discard an exact obsolete empty draft without discarding apprentice edits.
 
 Keyboard edits use undoable native text insertion where available, with a
 setRangeText fallback that dispatches the normal input event. Drafts, saved files,
@@ -88,8 +104,13 @@ Escape followed by Tab releases keyboard focus from the editor.
 
 ## Preview and checking boundary
 
-Run creates an immutable in-memory snapshot with an unguessable URL, independent
-of Save. Up to 32 snapshots are retained; snapshots expire after an hour or a
+Initial startup, reset, and draft recovery render the current files. Edits to
+HTML, CSS, and JavaScript schedule a preview update after a 200 ms pause; the
+manual Run action refreshes immediately. Both paths create an immutable in-memory
+snapshot with an unguessable URL, independent of Save. A generation counter
+invalidates pending responses as soon as newer edits arrive, so a slow older
+request cannot overwrite the current preview. Live preview updates do not block typing. Autosave runs separately after
+a longer editing pause. Up to 32 snapshots are retained; snapshots expire after an hour or a
 server restart. Only index.html, style.css, and script.js can be retrieved.
 
 The preview listener has no management routes. Its `/api/` proxy forwards only

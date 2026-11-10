@@ -85,6 +85,7 @@ for API details, saved work, and checks. The first build includes Chromium.
   automatic saved-project checks at http://localhost:8080/challenges.
 - [Setup and user guide](apps/build4fun/README.md): environment settings, editor workflow,
   deployment, troubleshooting, and checks.
+- [Build4Fun interface](docs/build4fun/design.md): visual design, navigation, and accessibility.
 - [Project purpose](docs/build4fun/purpose.md): audience and learning approach.
 - [Implementation](docs/build4fun/implementation.md): architecture, persistence,
   validation, Docker execution, and current boundaries.

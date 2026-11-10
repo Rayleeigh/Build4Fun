@@ -271,6 +271,11 @@ are rejected before deployment. Multiple Docker operations are serialized; the
 server remains available while Docker is working. Persistent-volume deletion is
 not offered by these controls.
 
+## Interface
+
+See the [interface guide](../../docs/build4fun/design.md) for the visual system,
+light/dark appearance, subtle glass surfaces, and accessibility behavior.
+
 ## Checks
 
 ```sh

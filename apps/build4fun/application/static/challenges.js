@@ -1,5 +1,14 @@
 'use strict';
 const byId = id => document.getElementById(id);
+const appearance=matchMedia('(prefers-color-scheme: dark)');
+function updateAppearance() {
+  let mode='system';
+  try {mode=localStorage.getItem('build4fun-theme')||'system';} catch (_) {}
+  document.documentElement.dataset.theme=mode==='dark'||(mode==='system'&&appearance.matches)?'dark':'light';
+}
+updateAppearance();
+appearance.addEventListener('change',updateAppearance);
+window.addEventListener('storage',event=>{if(event.key==='build4fun-theme')updateAppearance();});
 let data, busy = false, signature = '';
 function node(tag, text, className) {
   const result = document.createElement(tag); result.textContent = text;
@@ -33,7 +42,10 @@ function render() {
       const ok = !selected?.error && selected?.checks[challenge.id]?.[i];
       checks.append(node('li', `${ok ? '✓ Passed' : '○ Pending'} — ${label}`, ok ? 'passed' : ''));
     });
-    card.append(checks, node('h3', 'Explain it'), node('p', challenge.question), node('h3', 'Try it for real'), node('p', challenge.experiment));
+    card.append(checks);
+    for (const [title,text] of [['Explain it',challenge.question],['Try it for real',challenge.experiment]]) {
+      const details=document.createElement('details');details.append(node('summary',title),node('p',text));card.append(details);
+    }
     const link = node('a', 'Read Markdown lesson ↗'); link.href = `/docs/challenges/${challenge.id}.md`; card.append(link);
     byId('challenges').append(card);
   });

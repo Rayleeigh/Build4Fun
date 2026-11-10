@@ -60,7 +60,8 @@ def main():
         try:
             with sync_playwright() as playwright:
                 browser = playwright.chromium.launch()
-                page = browser.new_page(viewport={'width': 1440, 'height': 1050}, device_scale_factor=1)
+                context = browser.new_context(viewport={'width': 1440, 'height': 1050}, device_scale_factor=1)
+                page = context.new_page()
                 page.on('pageerror', lambda error: errors.append(str(error)))
                 page.goto(f'http://127.0.0.1:{server.server_port}')
                 expect(page.get_by_role('heading', name='Projects', exact=True)).to_be_visible()
@@ -71,6 +72,7 @@ def main():
                 expect(page.locator('.service-card')).to_have_count(1)
                 expect(page.locator('#workspace-navigation').get_by_role('button', name='Build', exact=True)).to_have_count(0)
                 expect(page.locator('#content input')).to_have_count(0)
+                expect(page.locator('#detail-pane .code-body')).to_contain_text('nginx:latest')
                 page.screenshot(path=str(artifacts / 'builder.png'), full_page=True, animations="disabled")
                 expect(page.locator('#project-files').get_by_role('button', name='nginx.conf', exact=True)).to_be_visible()
                 expect(page.locator('#project-tree').get_by_role('button', name='homelab', exact=True)).to_be_visible()
@@ -302,6 +304,9 @@ def main():
 
                 # Responsive layout and dark appearance.
                 page.emulate_media(color_scheme='dark')
+                expect(page.locator('html')).to_have_attribute('data-theme','dark')
+                page.wait_for_timeout(200)
+                assert page.locator('.page-actions .button.secondary').first.evaluate('(el)=>getComputedStyle(el).backgroundColor')=='rgb(55, 55, 61)'
                 page.screenshot(path=str(artifacts / 'dark.png'), full_page=True, animations="disabled")
                 page.set_viewport_size({'width': 390, 'height': 844})
                 expect(page.get_by_role('heading', name='Build environment')).to_be_visible()
@@ -460,6 +465,30 @@ def main():
                 page.get_by_role('button', name='Deploy', exact=True).click()
                 expect(dialog.get_by_role('heading', name='Deploy environment', exact=True)).to_be_visible()
                 dialog.get_by_role('button', name='Cancel', exact=True).click()
+                # Challenge navigation, disclosures, theme sync, and readable glass fallback.
+                learning=page.context.new_page()
+                learning.set_viewport_size({'width':1200,'height':1000})
+                learning.on('pageerror',lambda error: errors.append(str(error)))
+                learning.goto(f'http://127.0.0.1:{server.server_port}/challenges')
+                expect(learning.locator('.challenge-card')).to_have_count(6)
+                learning.get_by_role('button',name='Check now',exact=True).click()
+                expect(learning.locator('#status')).to_contain_text('Last successful refresh')
+                exercise=learning.locator('.challenge-card').first
+                exercise.locator('summary').filter(has_text='Explain it').click()
+                expect(exercise.locator('details').first.locator('p')).to_be_visible()
+                learning.screenshot(path=str(artifacts/'challenges.png'),full_page=True,animations='disabled')
+                page.evaluate("setTheme('dark')")
+                expect(learning.locator('html')).to_have_attribute('data-theme','dark')
+                learning.wait_for_timeout(200)
+                learning.screenshot(path=str(artifacts/'challenges-dark.png'),full_page=True,animations='disabled')
+                cdp=page.context.new_cdp_session(page)
+                cdp.send('Emulation.setEmulatedMedia',{'features':[{'name':'prefers-contrast','value':'more'}]})
+                assert page.locator('#navigation').evaluate('(el)=>getComputedStyle(el).backdropFilter')=='none'
+                cdp.send('Emulation.setEmulatedMedia',{'features':[]})
+                learning.set_viewport_size({'width':390,'height':844})
+                assert learning.evaluate('document.documentElement.scrollWidth<=innerWidth')
+                learning.screenshot(path=str(artifacts/'challenges-mobile.png'),full_page=True,animations='disabled')
+                learning.close()
                 assert not errors, errors
                 browser.close()
         finally:

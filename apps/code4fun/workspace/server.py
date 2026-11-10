@@ -22,6 +22,20 @@ LESSONS = ROOT / 'challenges' / 'code'
 FILES = ('index.html', 'style.css', 'script.js')
 MAX_BODY = 512 * 1024
 
+# Exact original starter, used only to upgrade untouched workspaces and empty drafts.
+LEGACY_STARTER = {
+    'index.html': '<!doctype html>\n<html lang="en">\n<head>\n  <meta charset="utf-8">\n  <meta name="viewport" content="width=device-width, initial-scale=1">\n  <title>My Server Dashboard</title>\n  <link rel="stylesheet" href="style.css">\n  <script src="script.js" defer></script>\n</head>\n<body>\n  <!-- Build your dashboard here. Start with stage 1. -->\n</body>\n</html>\n',
+    'style.css': '/* Your dashboard styles. */\n',
+    'script.js': '// Your dashboard interactions. API requests use relative paths, e.g. /api/hostname/.\n',
+}
+
+# The second starter fixed nesting but still had no visible body content.
+PREVIEWLESS_STARTERS = [LEGACY_STARTER, {
+    **LEGACY_STARTER,
+    'index.html': '\n'.join('  ' + line if 2 <= index <= 11 else line
+                            for index, line in enumerate(LEGACY_STARTER['index.html'].splitlines())) + '\n',
+}]
+
 
 def validate_files(files):
     if not isinstance(files, dict) or set(files) != set(FILES):
@@ -44,6 +58,12 @@ class Store:
         self.check_lock = threading.Lock()
         if not self.path.exists():
             self.write({'files': self.starter(), 'stage': 0, 'completed': {}, 'revision': secrets.token_hex(16)})
+        else:
+            state = self.read()
+            if state.get('stage') == 0 and not state.get('completed') and state.get('files') in PREVIEWLESS_STARTERS:
+                state.update(files=self.starter(), revision=secrets.token_hex(16))
+                self.write(state)
+
 
     def starter(self):
         return {name: (LESSONS / 'starter' / name).read_text() for name in FILES}
@@ -187,7 +207,9 @@ def make_handler(store, preview=False, preview_port=8091, api_url='http://127.0.
             if path == '/code4fun/api/project':
                 with store.lock:
                     state = store.read()
-                self.reply(200, {**state, 'stages': json.loads((LESSONS / 'stages.json').read_text()), 'preview_port': preview_port})
+                untouched = state.get('stage') == 0 and not state.get('completed') and state['files'] == store.starter()
+                self.reply(200, {**state, 'stages': json.loads((LESSONS / 'stages.json').read_text()),
+                                 'preview_port': preview_port, 'obsolete_starters': PREVIEWLESS_STARTERS if untouched else []})
             elif path == '/code4fun/api/reference':
                 try:
                     with urlopen(api_url.rstrip('/') + '/api/info', timeout=4) as response:

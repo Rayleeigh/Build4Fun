@@ -37,10 +37,10 @@ external recovery.
 ## Workspace
 
 - Edit `index.html`, `style.css`, or `script.js`. The initial HTML links both supporting files.
-- Run preview renders a snapshot of current edits. Save project stores files and the selected stage atomically.
+- The preview renders on startup and updates automatically about 200 ms after edits to HTML, CSS, or JavaScript. Run preview refreshes it immediately. Edits and mission selection autosave after an 800 ms pause; Save project or Ctrl/⌘S saves immediately. All three files and the selected stage are stored atomically.
 - Check my work saves first, then evaluates the selected stage in Chromium using controlled API data. Stage 6 also checks delayed responses, failures, null measurements, and periodic refresh.
 - Open the collapsible Missions list in the left panel to switch tasks without changing the editor or preview. The completed count sits beside the progress bar. Switching stages preserves the project. Completion badges record previously passed checkpoints; they are learning history, not a claim that the current code still passes every earlier stage.
-- Browser drafts can be recovered after refresh. Older drafts preserve save conflicts. Download a backup before reloading if a newer save exists.
+- The editor shows Unsaved changes, Saving…, and All changes saved. Autosave keeps typing responsive and retains edits made while an earlier save is running. Browser drafts can be recovered after refresh. Older drafts preserve save conflicts. Download a backup before reloading if a newer save exists.
 - Download backup saves a JSON copy of all three files and the selected stage. It can be read and copied manually; automatic backup import is not implemented.
 - Reset entire project asks for confirmation, replaces all three files with starter content, and clears all progress. Individual-stage resets are not offered.
 
@@ -52,12 +52,24 @@ The lesson panel specifies the element IDs and behaviors checked at each stage.
 Checks accept different implementations; API checks change sample values to
 reject hardcoded responses. Regular previews always use the live API.
 
+Autosave uses the same revision checks as manual saving. A conflict pauses
+autosave and preserves the draft: download a backup, then reload to resolve it.
+Network or server errors show Not saved; use Save project to retry or continue
+editing to schedule another attempt. If you close the tab before a pending save
+finishes, browser draft recovery remains available on reopening.
+
 ## Editor indentation
 
-The starter HTML and editor use two-space indentation. Tab inserts spaces to the
-next two-column stop; select several lines to indent them together. Shift+Tab
-outdents the current or selected lines. Backspace in leading whitespace removes
-an indentation step.
+The starter HTML uses two-space nesting; the editor inserts actual tab characters,
+displayed at two-column tab stops. Its body includes a
+visible placeholder message, so a new or reset project's preview is not blank.
+Replace that message with your own dashboard; it does not satisfy the first
+mission's heading, paragraph, or server-section checks. While the editable code
+area has focus, Tab inserts a tab character or indents selected lines. Shift+Tab
+outdents the current or selected lines, removing one leading tab or up to two
+spaces for existing space-indented code. Outside the editor, both keys retain
+normal browser focus navigation. Backspace in leading whitespace removes an
+indentation step.
 
 Enter preserves the current indentation and adds a level after an opening HTML
 tag or a JavaScript/CSS block delimiter. Between matching opening and closing
@@ -66,8 +78,13 @@ on the following line. HTML void elements such as meta and link do not add a lev
 Native undo is preserved where the browser supports undoable textarea insertion.
 
 Press Escape, then Tab (or Shift+Tab) to move keyboard focus outside the editor.
-Loading or saving a file does not reformat it; existing apprentice formatting is
-preserved. The corrected starter is used for new workspaces and explicit resets.
+Loading or saving a file does not reformat apprentice code. On startup, an
+untouched older starter project is upgraded to the current visible starter only
+when all three files exactly match a known older starter, the selected stage is the first,
+and no missions have been completed. Matching empty browser drafts are discarded
+only when the saved project is also an untouched current starter. Edited files,
+other stages, completion history, and genuine drafts are preserved. New workspaces
+and explicit resets use the current starter.
 
 ## Tutorial and completion feedback
 

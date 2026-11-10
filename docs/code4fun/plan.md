@@ -39,8 +39,8 @@ The proposed first workspace contains a challenge panel, file explorer, text
 editor, website preview, and check results. Initial apprentice files are
 `index.html`, `style.css`, and `script.js`.
 
-Run refreshes the preview from the current edits. Save durably preserves the
-project. Moving between stages must preserve apprentice code rather than
+The preview updates automatically from current edits. Autosave durably preserves
+the project after a short pause; Run and Save remain available for immediate actions. Moving between stages must preserve apprentice code rather than
 replace it with the next stage's starter files. Stage completion records
 progress without blocking access to previous instructions.
 

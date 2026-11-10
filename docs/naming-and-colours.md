@@ -30,9 +30,8 @@ for readable text, button labels, and interaction states; the base identity hex
 remains the value in the table. Preserve semantic colours for errors and success
 rather than making every status match the application's identity.
 
-These values define the shared convention. Code4Fun already uses its green
-accent; this document does not imply that every existing Build4Fun control has
-been recoloured. Crack4Fun's red applies when its interface is implemented.
+Build4Fun uses its blue accent and Code4Fun uses its green accent. Crack4Fun's
+red applies when its interface is implemented.
 
 ## Crack4Fun naming
 

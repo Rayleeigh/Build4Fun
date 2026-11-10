@@ -5,7 +5,7 @@ import tempfile
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'workspace'))
-from server import Store, Conflict, validate_files
+from server import Store, Conflict, validate_files, LEGACY_STARTER, PREVIEWLESS_STARTERS
 
 
 class WorkspaceTests(unittest.TestCase):
@@ -13,6 +13,32 @@ class WorkspaceTests(unittest.TestCase):
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
         self.store = Store(self.directory.name)
+
+    def test_untouched_original_starter_upgrades_once_and_preserves_preferences(self):
+        state = self.store.read()
+        state.update(files=dict(LEGACY_STARTER), tutorial_seen=True)
+        self.store.write(state)
+        upgraded = Store(self.directory.name).read()
+        self.assertEqual(upgraded['files'], self.store.starter())
+        self.assertIn('\n  <head>\n    <meta', upgraded['files']['index.html'])
+        self.assertNotEqual(upgraded['revision'], state['revision'])
+        self.assertTrue(upgraded['tutorial_seen'])
+        self.assertEqual(Store(self.directory.name).read(), upgraded)
+
+    def test_both_empty_starters_upgrade_to_visible_content(self):
+        for files in PREVIEWLESS_STARTERS:
+            state = {**self.store.read(), 'files': files, 'stage': 0, 'completed': {}}
+            self.store.write(state)
+            updated = Store(self.directory.name).read()
+            self.assertIn('id="starter-message"', updated['files']['index.html'])
+            self.assertEqual(updated['files'], self.store.starter())
+
+    def test_starter_upgrade_preserves_edits_and_progress(self):
+        for field, value in [('files', {**LEGACY_STARTER, 'style.css': 'body { color: red; }'}),
+                             ('stage', 1), ('completed', {'0': {'checked_at': 123}})]:
+            state = {**self.store.read(), 'files': dict(LEGACY_STARTER), 'stage': 0, 'completed': {}, field: value}
+            self.store.write(state)
+            self.assertEqual(Store(self.directory.name).read(), state)
 
     def test_stage_transitions_preserve_files_and_survive_restart(self):
         original = self.store.read()

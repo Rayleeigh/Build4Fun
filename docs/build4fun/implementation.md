@@ -102,6 +102,13 @@ The registry currently supports definition version 1. It rejects missing or
 unsupported definitions instead of substituting another version. Historical
 definition versions and general definition migrations are not implemented.
 
+## Interface design
+
+The [interface guide](design.md) describes the shared visual system, Build4Fun's
+blue accent, glass surfaces and their accessibility fallbacks, action hierarchy,
+and responsive navigation. The refactor preserves the runtime and persistence
+behavior described below.
+
 ## Editor and learning views
 
 The application starts on the Projects landing page without selecting or
