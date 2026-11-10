@@ -67,14 +67,23 @@ def main():
                 page.locator('#tutorial-next').click()
                 assert page.locator('.topic-card[aria-current="step"] strong').inner_text() == 'HTML'
                 assert '<h2>' in page.locator('#example-code').inner_text()
+                assert page.evaluate('''() => {
+                    renderTour();
+                    return document.getAnimations().some(animation =>
+                        animation.effect.target.id === 'tutorial-text' &&
+                        animation.effect.getTiming().duration <= 220);
+                }''')
                 assert page.locator('#example-preview h2').inner_text() == 'My reading list'
-                page.screenshot(path='/tmp/code4fun-course.png', full_page=True)
+                page.screenshot(path='/tmp/code4fun-course.png', full_page=True, animations='disabled')
                 page.set_viewport_size({'width':390,'height':844})
                 assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
-                page.screenshot(path='/tmp/code4fun-course-mobile.png', full_page=True)
+                page.screenshot(path='/tmp/code4fun-course-mobile.png', full_page=True, animations='disabled')
                 page.set_viewport_size({'width':1512,'height':1100})
+                page.emulate_media(reduced_motion='reduce')
                 page.locator('#tutorial-next').click()
                 assert page.locator('.topic-card[aria-current="step"] strong').inner_text() == 'CSS'
+                assert page.evaluate("() => !document.getAnimations().some(animation => ['tutorial-title','tutorial-text','tutorial-example'].includes(animation.effect.target.id))")
+                page.emulate_media(reduced_motion='no-preference')
                 assert page.locator('#example-preview .demo-styled').count() == 1
                 page.locator('#tutorial-next').click()
                 page.locator('#example-preview button').click()
@@ -89,14 +98,14 @@ def main():
                 tip=page.locator('#tutorial-card').bounding_box()
                 target=page.locator('#mission-picker').bounding_box()
                 assert tip['x'] >= target['x']+target['width'], (tip,target)
-                page.screenshot(path='/tmp/code4fun-anchored-tour.png', full_page=True)
+                page.screenshot(path='/tmp/code4fun-anchored-tour.png', full_page=True, animations='disabled')
                 page.set_viewport_size({'width':390,'height':844})
                 page.wait_for_timeout(150)
                 tip=page.locator('#tutorial-card').bounding_box()
                 target=page.locator('#mission-summary').bounding_box()
                 assert tip['x']>=0 and tip['x']+tip['width']<=391,tip
                 assert tip['y']>=target['y']+target['height'] or tip['y']+tip['height']<=target['y'],(tip,target)
-                page.screenshot(path='/tmp/code4fun-anchored-mobile.png', full_page=True)
+                page.screenshot(path='/tmp/code4fun-anchored-mobile.png', full_page=True, animations='disabled')
                 page.set_viewport_size({'width':1512,'height':1100})
                 page.locator('#tutorial-next').click()
                 page.locator('#tutorial-try').click()
@@ -187,12 +196,12 @@ def main():
                 page.locator('#code').fill('body { background: #d8f1e5; }')
                 page.get_by_role('button', name='Run preview', exact=False).click()
                 page.frame_locator('#preview').get_by_role('heading', name='A recovered draft').wait_for()
-                page.screenshot(path='/tmp/code4fun-desktop.png', full_page=True)
+                page.screenshot(path='/tmp/code4fun-desktop.png', full_page=True, animations='disabled')
                 frame = page.frame_locator('#preview').locator('body')
                 assert frame.evaluate("() => {try {parent.document.body; return false;} catch (_) {return true;}}")
                 assert frame.evaluate("async (element, origin) => {try {await fetch(origin+'/code4fun/api/project'); return false;} catch (_) {return true;}}", origin)
                 page.set_viewport_size({'width':390,'height':844})
-                page.screenshot(path='/tmp/code4fun-mobile.png', full_page=True)
+                page.screenshot(path='/tmp/code4fun-mobile.png', full_page=True, animations='disabled')
                 assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
                 # An old browser draft must not silently overwrite a newer save.
                 saved = store.read()

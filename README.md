@@ -10,7 +10,7 @@ the images, ports, paths, and settings themselves.
 ## Monorepo
 
 This repository contains Build4Fun, Code4Fun (an interactive frontend coding
-workspace), and a placeholder for Hack4Fun (a beginner CTF learning experience).
+workspace), and a placeholder for Crack4Fun (a beginner CTF learning experience).
 Build4Fun and Code4Fun run independently.
 
 See [repository architecture](docs/monorepo.md) for module boundaries, challenge
@@ -20,7 +20,7 @@ locations, and learning environments.
 
 The root Dockerfile builds the Build4Fun controller. Code4Fun has a separate
 workspace image and prepared API container; neither receives Docker access.
-Hack4Fun sandboxes remain future work.
+Crack4Fun sandboxes remain future work.
 
 Learner environments must not receive the controller's Docker socket, workspace,
 or host filesystem mounts. Before introducing execution, define resource limits,
@@ -74,6 +74,8 @@ for API details, saved work, and checks. The first build includes Chromium.
 - Compose downloads and project ZIP exports.
 
 ## Documentation
+
+- [Naming and colours](docs/naming-and-colours.md): shared application identity and the Crack4Fun name.
 
 - [Code4Fun guide](apps/code4fun/README.md): launch, workflow, API, and checks.
 - [Code4Fun plan](docs/code4fun/plan.md) and [implementation](docs/code4fun/implementation.md):

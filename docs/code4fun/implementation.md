@@ -47,6 +47,14 @@ resize or scrolling. It restores the original file selection, mission-list state
 and scroll position when dismissed. Examples do not run or overwrite apprentice
 source files.
 
+The interface uses system typography, neutral surfaces, green action controls,
+and a compact topic selector. Code4Fun uses `#00C400` as its identifying accent,
+with darker green foregrounds for readable labels and button text. Topic buttons stay mounted between tutorial steps
+so their selected state can transition smoothly. Tutorial headings, explanations,
+and examples use a 180 ms fade and small vertical movement. Both these animations
+and control transitions respect `prefers-reduced-motion`; enabling that preference
+also cancels an in-progress tutorial animation.
+
 Desktop panels share a bounded height and matching headers; flex children scroll
 internally to prevent expanded hints or results from changing the outer frame.
 Tablet and mobile layouts reflow the panels instead of squeezing three columns.

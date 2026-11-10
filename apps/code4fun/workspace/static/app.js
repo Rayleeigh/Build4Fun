@@ -277,6 +277,23 @@ function scheduleTourPosition() {
 window.addEventListener('resize',scheduleTourPosition);
 window.addEventListener('scroll',scheduleTourPosition,true);
 new ResizeObserver(scheduleTourPosition).observe($('tutorial-card'));
+const tutorialMotion = matchMedia('(prefers-reduced-motion: reduce)');
+let tutorialAnimations = [];
+function animateTutorialStep() {
+  tutorialAnimations.forEach(animation=>animation.cancel());
+  tutorialAnimations=[];
+  if(tutorialMotion.matches)return;
+  for(const id of ['tutorial-title','tutorial-text','tutorial-example']) {
+    if($(id).hidden)continue;
+    tutorialAnimations.push($(id).animate(
+      [{opacity:0,transform:'translateY(5px)'},{opacity:1,transform:'translateY(0)'}],
+      {duration:180,easing:'cubic-bezier(.2,.7,.3,1)'}
+    ));
+  }
+}
+tutorialMotion.addEventListener('change',event=>{
+  if(event.matches){tutorialAnimations.forEach(animation=>animation.cancel());tutorialAnimations=[];}
+});
 function renderTour() {
   document.querySelectorAll('.tour-target').forEach(node=>node.classList.remove('tour-target'));
   const step=tourSteps[tourStep],isCourse=!step.target;
@@ -284,12 +301,17 @@ function renderTour() {
   $('tutorial-count').textContent=`${tourStep+1} of ${tourSteps.length}`;
   $('tutorial-title').textContent=step.title;$('tutorial-text').textContent=step.text;
   $('tutorial-topics').hidden=!isCourse;
-  $('tutorial-topics').replaceChildren(...courseTopics.map((topic,index)=>{
-    const card=element('button',undefined,'topic-card');
-    card.append(element('span',`0${index+1}`,'topic-number'),element('strong',topic.name),element('span',topic.subtitle));
+  if (!$('tutorial-topics').children.length) {
+    $('tutorial-topics').replaceChildren(...courseTopics.map((topic,index)=>{
+      const card=element('button',undefined,'topic-card');
+      card.append(element('strong',topic.name),element('span',topic.subtitle));
+      card.onclick=()=>{if(tourActionBusy)return;tourStep=index+1;renderTour();};return card;
+    }));
+  }
+  [...$('tutorial-topics').children].forEach((card,index)=>{
     if(step.topic===index)card.setAttribute('aria-current','step');
-    card.onclick=()=>{if(tourActionBusy)return;tourStep=index+1;renderTour();};return card;
-  }));
+    else card.removeAttribute('aria-current');
+  });
   $('tutorial-example').hidden=step.topic===undefined;
   if(step.topic!==undefined){
     const topic=courseTopics[step.topic];$('example-language').textContent=topic.language;
@@ -305,6 +327,7 @@ function renderTour() {
     target.scrollIntoView({block:'nearest',inline:'nearest',behavior:'instant'});
   }
   scheduleTourPosition();
+  animateTutorialStep();
 }
 function startTutorial() {
   if(busy||pendingDraft||!state||$('tutorial-dialog').open)return;
@@ -317,7 +340,7 @@ async function finishTutorial() {
   tourActionBusy=true;$('tutorial-next').disabled=true;$('tutorial-skip').disabled=true;$('tutorial-back').disabled=true;
   try {
     await request('tutorial',{});state.tutorial_seen=true;
-    $('tutorial-dialog').close();document.querySelectorAll('.tour-target').forEach(node=>node.classList.remove('tour-target'));
+    $('tutorial-dialog').close();tutorialAnimations.forEach(animation=>animation.cancel());document.querySelectorAll('.tour-target').forEach(node=>node.classList.remove('tour-target'));
     if(tourOriginal){selectFile(tourOriginal.file);$('mission-picker').open=tourOriginal.missionsOpen;document.querySelector('.lesson-body').scrollTop=tourOriginal.lessonScroll;window.scrollTo({left:tourOriginal.x,top:tourOriginal.y,behavior:'instant'});}
     $('tutorial-open').focus({preventScroll:true});
   } catch(error) {$('tutorial-error').textContent=error.message;}

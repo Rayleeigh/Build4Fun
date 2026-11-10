@@ -156,5 +156,5 @@ instructions specify element IDs and behaviors. The API contract is served at
 check-process boundaries are described in the implementation guide. Shared hosting
 and individual accounts remain unimplemented.
 
-Hack4Fun, apprentice-written backends, a browser terminal, and shared-hosting
+Crack4Fun, apprentice-written backends, a browser terminal, and shared-hosting
 accounts are outside this initial Code4Fun plan.
