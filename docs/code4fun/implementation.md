@@ -36,6 +36,30 @@ badges represent historical milestones. Checks save current edits first and
 record progress only if the saved revision remains current. Reset replaces all
 files and clears progress in a single save after browser confirmation.
 
+`tutorial_seen` is stored with the project when the first-run walkthrough is
+finished or skipped. This update does not change the file revision or discard
+edits. Saves and resets preserve it. A header action can replay the walkthrough.
+The course introduction uses four topic cards with isolated, trusted DOM examples:
+HTML structure, CSS presentation, a JavaScript interaction, and an API metadata
+request. The subsequent walkthrough uses a movable dialog and spotlight. Its
+placement is calculated from each target's viewport rectangle and updated on
+resize or scrolling. It restores the original file selection, mission-list state,
+and scroll position when dismissed. Examples do not run or overwrite apprentice
+source files.
+
+Desktop panels share a bounded height and matching headers; flex children scroll
+internally to prevent expanded hints or results from changing the outer frame.
+Tablet and mobile layouts reflow the panels instead of squeezing three columns.
+Mission selection lives in a collapsible list in the task panel and updates the
+instructions without rerunning the preview or replacing editor contents.
+
+The API reference dialog reads the prepared API metadata through a fixed
+same-origin management endpoint, `/code4fun/api/reference`. It renders schema
+fields, examples, and measurement notes as text, with retry feedback when the API
+is unavailable. Raw `/api/info` remains available through the preview proxy.
+First-time mission completion triggers a six-second toast with an animated timer;
+hover and keyboard focus pause it, and historical completion suppresses repeats.
+
 ## Preview and checking boundary
 
 Run creates an immutable in-memory snapshot with an unguessable URL, independent

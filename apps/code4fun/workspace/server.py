@@ -74,6 +74,13 @@ class Store:
             self.write(state)
             return state
 
+    def finish_tutorial(self):
+        with self.lock:
+            state = self.read()
+            state['tutorial_seen'] = True
+            self.write(state)
+        return {'tutorial_seen': True}
+
     def snapshot(self, files):
         files = validate_files(files)
         with self.lock:
@@ -181,6 +188,12 @@ def make_handler(store, preview=False, preview_port=8091, api_url='http://127.0.
                 with store.lock:
                     state = store.read()
                 self.reply(200, {**state, 'stages': json.loads((LESSONS / 'stages.json').read_text()), 'preview_port': preview_port})
+            elif path == '/code4fun/api/reference':
+                try:
+                    with urlopen(api_url.rstrip('/') + '/api/info', timeout=4) as response:
+                        self.reply(200, response.read(128 * 1024))
+                except (URLError, TimeoutError, OSError):
+                    self.reply(502, {'error': 'The API reference is unavailable. Check the API service and try again.'})
             elif path in ('/', '/app.js', '/style.css'):
                 name = 'index.html' if path == '/' else path[1:]
                 self.reply(200, (STATIC / name).read_bytes(), {'index.html': 'text/html', 'app.js': 'text/javascript', 'style.css': 'text/css'}[name] + '; charset=utf-8')
@@ -202,7 +215,9 @@ def make_handler(store, preview=False, preview_port=8091, api_url='http://127.0.
                 if not isinstance(data, dict):
                     raise ValueError('Expected a JSON object.')
                 path = urlsplit(self.path).path
-                if path in ('/code4fun/api/save', '/code4fun/api/reset'):
+                if path == '/code4fun/api/tutorial':
+                    self.reply(200, store.finish_tutorial())
+                elif path in ('/code4fun/api/save', '/code4fun/api/reset'):
                     self.reply(200, store.save(data, reset=path.endswith('/reset')))
                 elif path == '/code4fun/api/run':
                     token = store.snapshot(data.get('files'))

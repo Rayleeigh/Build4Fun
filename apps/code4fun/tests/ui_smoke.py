@@ -33,7 +33,7 @@ def main():
         api_server = start(api.handler(api.Measurements()))
         api_url = f'http://127.0.0.1:{api_server.server_port}'
         preview = start(make_handler(store, True, api_url=api_url))
-        server = start(make_handler(store, preview_port=preview.server_port))
+        server = start(make_handler(store, preview_port=preview.server_port, api_url=api_url))
         server.preview_internal_port = preview.server_port
         origin = f'http://127.0.0.1:{server.server_port}'
         preview_origin = f'http://127.0.0.1:{preview.server_port}'
@@ -59,12 +59,117 @@ def main():
                 page = browser.new_page(viewport={'width': 1512, 'height': 1100})
                 page.goto(origin)
                 page.wait_for_function('() => document.querySelector("#save-status").textContent==="All changes saved"')
+                # First-run tutorial has real actions and is persisted per workspace.
+                page.locator('#tutorial-dialog').wait_for(state='visible')
+                assert 'This is the course' in page.locator('#tutorial-title').inner_text()
+                assert page.locator('.topic-card').count() == 4
+                original_code = page.locator('#code').input_value()
+                page.locator('#tutorial-next').click()
+                assert page.locator('.topic-card[aria-current="step"] strong').inner_text() == 'HTML'
+                assert '<h2>' in page.locator('#example-code').inner_text()
+                assert page.locator('#example-preview h2').inner_text() == 'My reading list'
+                page.screenshot(path='/tmp/code4fun-course.png', full_page=True)
+                page.set_viewport_size({'width':390,'height':844})
+                assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
+                page.screenshot(path='/tmp/code4fun-course-mobile.png', full_page=True)
+                page.set_viewport_size({'width':1512,'height':1100})
+                page.locator('#tutorial-next').click()
+                assert page.locator('.topic-card[aria-current="step"] strong').inner_text() == 'CSS'
+                assert page.locator('#example-preview .demo-styled').count() == 1
+                page.locator('#tutorial-next').click()
+                page.locator('#example-preview button').click()
+                assert page.locator('#example-preview').inner_text().endswith('Books added: 1')
+                page.locator('#tutorial-next').click()
+                page.locator('#example-preview button').click()
+                page.get_by_text('Code4Fun teaching API', exact=True).wait_for()
+                page.locator('#tutorial-next').click()
+                assert page.locator('#mission-picker').evaluate('(el)=>el.open')
+                page.wait_for_function('() => document.querySelector("#tutorial-dialog").classList.contains("anchored") && parseFloat(document.querySelector("#tutorial-dialog").style.left)>0')
+                page.wait_for_timeout(100)
+                tip=page.locator('#tutorial-card').bounding_box()
+                target=page.locator('#mission-picker').bounding_box()
+                assert tip['x'] >= target['x']+target['width'], (tip,target)
+                page.screenshot(path='/tmp/code4fun-anchored-tour.png', full_page=True)
+                page.set_viewport_size({'width':390,'height':844})
+                page.wait_for_timeout(150)
+                tip=page.locator('#tutorial-card').bounding_box()
+                target=page.locator('#mission-summary').bounding_box()
+                assert tip['x']>=0 and tip['x']+tip['width']<=391,tip
+                assert tip['y']>=target['y']+target['height'] or tip['y']+tip['height']<=target['y'],(tip,target)
+                page.screenshot(path='/tmp/code4fun-anchored-mobile.png', full_page=True)
+                page.set_viewport_size({'width':1512,'height':1100})
+                page.locator('#tutorial-next').click()
+                page.locator('#tutorial-try').click()
+                assert page.get_by_role('tab', name='style.css', exact=True).get_attribute('aria-selected') == 'true'
+                page.locator('#tutorial-next').click()
+                page.locator('#tutorial-try').click()
+                page.locator('#tutorial-next').click()
+                assert 'Save your work' in page.locator('#tutorial-title').inner_text()
+                page.locator('#tutorial-next').click()
+                assert 'Check the current mission' in page.locator('#tutorial-title').inner_text()
+                page.locator('#tutorial-next').click()
+                page.locator('#tutorial-try').click()
+                page.locator('#api-content section').first.wait_for()
+                assert page.locator('#api-content h3').filter(has_text='/api/hostname/').count() == 1
+                assert 'memory_limit_bytes' in page.locator('#api-content').inner_text()
+                assert 'async function exploreApi()' in page.locator('#api-content').inner_text()
+                page.keyboard.press('Escape')
+                assert not page.locator('#api-dialog').is_visible()
+                page.locator('#tutorial-next').click()
+                page.locator('#tutorial-dialog').wait_for(state='hidden')
+                assert store.read()['tutorial_seen']
+                assert page.locator('#code').input_value() == original_code
+                page.reload()
+                page.wait_for_function('() => document.querySelector("#save-status").textContent==="All changes saved"')
+                assert not page.locator('#tutorial-dialog').is_visible()
+                page.locator('#tutorial-open').click()
+                page.locator('#tutorial-skip').click()
+                page.locator('#tutorial-dialog').wait_for(state='hidden')
+                # Desktop panels share header and bottom edges, even with long hints.
+                for width in (1512,1280):
+                    page.set_viewport_size({'width':width,'height':1000})
+                    boxes=[page.locator(selector).bounding_box() for selector in ('.lesson','.editor','.preview')]
+                    assert max(b['y'] for b in boxes)-min(b['y'] for b in boxes)<2,boxes
+                    bottoms=[b['y']+b['height'] for b in boxes]
+                    assert max(bottoms)-min(bottoms)<2,boxes
+                    headers=[page.locator(selector).bounding_box()['height'] for selector in ('#mission-summary','.editor .panel-label','.preview .panel-label')]
+                    assert max(headers)-min(headers)<2,headers
+                page.locator('#lesson-help > summary').click()
+                assert page.locator('.lesson-body').evaluate('(el)=>el.scrollHeight>el.clientHeight')
+                boxes=[page.locator(selector).bounding_box() for selector in ('.lesson','.editor','.preview')]
+                assert max(b['height'] for b in boxes)-min(b['height'] for b in boxes)<2,boxes
+                page.locator('#lesson-help > summary').click()
+                page.set_viewport_size({'width':1512,'height':1100})
+                # Mission selection only changes the task, not the editor or preview.
+                preview_src = page.locator('#preview').get_attribute('src')
+                page.locator('#mission-picker > summary').click()
+                page.locator('#stages button').nth(1).click()
+                assert page.locator('#code').input_value() == original_code
+                assert page.locator('#preview').get_attribute('src') == preview_src
+                assert not page.locator('#mission-picker').evaluate('(el)=>el.open')
+                page.locator('#previous').click()
+                # Reference has an accessible modal and a recoverable offline state.
+                page.route('**/code4fun/api/reference', lambda route: route.fulfill(status=502, content_type='application/json', body='{"error":"API temporarily unavailable"}'))
+                page.locator('#api-link').click()
+                page.locator('#api-retry').wait_for(state='visible')
+                page.unroute('**/code4fun/api/reference')
+                page.locator('#api-retry').click()
+                page.locator('#api-content section').first.wait_for()
+                page.locator('#api-close').click()
                 page.locator('#code').fill('<h1>My dashboard</h1><p>My introduction.</p><section id="server-info"><h2>Server</h2></section>')
                 page.get_by_role('button', name='Run preview', exact=False).click()
                 page.frame_locator('#preview').get_by_role('heading', name='My dashboard').wait_for()
                 page.get_by_role('button', name='Check my work').click()
-                page.get_by_text('Checkpoint passed! Your progress is saved.', exact=True).wait_for(timeout=30000)
-                assert '1 / 6' in page.locator('#progress-count').inner_text()
+                page.get_by_text('Checkpoint passed!', exact=True).wait_for(timeout=30000)
+                page.mouse.move(0, 0)
+                page.wait_for_timeout(5100)
+                assert page.locator('#success-toast').is_visible()
+                page.locator('#success-toast').wait_for(state='hidden', timeout=3000)
+                assert page.locator('#notice').inner_text() == ''
+                page.get_by_role('button', name='Check my work').click()
+                page.wait_for_function('() => !document.querySelector("#check").disabled')
+                assert not page.locator('#success-toast').is_visible()
+                assert '1/6' in page.locator('#progress-count').inner_text()
                 page.get_by_role('button', name='Next stage').click()
                 assert 'My dashboard' in page.locator('#code').input_value()
                 page.get_by_role('button', name='Save project', exact=True).click()

@@ -39,19 +39,50 @@ external recovery.
 - Edit `index.html`, `style.css`, or `script.js`. The initial HTML links both supporting files.
 - Run preview renders a snapshot of current edits. Save project stores files and the selected stage atomically.
 - Check my work saves first, then evaluates the selected stage in Chromium using controlled API data. Stage 6 also checks delayed responses, failures, null measurements, and periodic refresh.
-- Switching stages preserves the project. Completion badges record previously passed checkpoints; they are learning history, not a claim that the current code still passes every earlier stage.
+- Open the collapsible Missions list in the left panel to switch tasks without changing the editor or preview. The completed count sits beside the progress bar. Switching stages preserves the project. Completion badges record previously passed checkpoints; they are learning history, not a claim that the current code still passes every earlier stage.
 - Browser drafts can be recovered after refresh. Older drafts preserve save conflicts. Download a backup before reloading if a newer save exists.
 - Download backup saves a JSON copy of all three files and the selected stage. It can be read and copied manually; automatic backup import is not implemented.
 - Reset entire project asks for confirmation, replaces all three files with starter content, and clears all progress. Individual-stage resets are not offered.
+
+On desktop, the Missions, Files, and Preview panels share the same header and
+bottom edges. Long instructions, expanded hints, code, and check results scroll
+inside their own sections. Smaller screens stack the panels.
 
 The lesson panel specifies the element IDs and behaviors checked at each stage.
 Checks accept different implementations; API checks change sample values to
 reject hardcoded responses. Regular previews always use the live API.
 
+## Tutorial and completion feedback
+
+On the first workspace visit, the tutorial presents four course cards: HTML,
+CSS, JavaScript, and APIs. Next highlights each topic with a short explanation,
+code sample, and rendered or interactive example. The JavaScript example responds
+to clicks, and the API example requests the prepared API description. These
+examples do not change apprentice files.
+
+The following workspace tips move beside the control they describe, highlighting
+mission selection, file tabs, Run, Save, checks, and the API reference. Their
+position follows scrolling and resizing, with a compact layout on small screens.
+Actions let you open a file, run the preview, and inspect the reference; the
+original file selection and mission-list state are restored when the tour ends.
+Use Tutorial in the header to replay it at any time.
+
+Completing or skipping the tutorial is remembered in the workspace volume, so
+container restarts, page reloads, and a project reset do not repeat it. A new
+workspace receives the tutorial on its first visit. Draft recovery is resolved
+before the tutorial opens.
+
+The first successful check for each mission shows a six-second notification with
+a duration bar along its bottom edge. Hovering over it or focusing it pauses the
+timer. Rechecking an already completed mission does not show it again; completion
+still appears in the mission list and check results. Resetting the entire project
+clears mission completion, allowing those notifications for the new attempt.
+
 ## Prepared API
 
-Open http://localhost:8091/api/info for field descriptions, units, availability,
-and scope. Trailing slashes are accepted for all five read-only GET endpoints:
+Open API reference in the workspace header for a formatted dialog with field
+descriptions, sample responses, JavaScript and curl examples, and measurement
+notes. The raw contract remains at http://localhost:8091/api/info. Trailing slashes are accepted for all five read-only GET endpoints:
 
 | Endpoint | Response |
 | --- | --- |
@@ -111,7 +142,7 @@ This is a trusted local learning workspace with one shared project per instance,
 not a shared hosting service. There are no accounts, multiuser sessions, or
 apprentice-written backends. The editor is plain text, without syntax highlighting
 or arbitrary extra files. Stage checks are formative feedback, not tamper-proof
-assessment. The API reference currently displays JSON.
+assessment.
 
 The preview uses a different port/origin, an iframe sandbox, and a restrictive
 content security policy. Check browsers block requests outside the snapshot and

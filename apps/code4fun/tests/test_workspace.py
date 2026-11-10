@@ -48,6 +48,18 @@ class WorkspaceTests(unittest.TestCase):
         self.assertEqual(reset['files'], self.store.starter())
         self.assertFalse(reset['completed'])
 
+    def test_tutorial_preference_survives_restart_save_and_reset_without_changing_revision(self):
+        original = self.store.read()
+        self.store.finish_tutorial()
+        updated = Store(self.directory.name).read()
+        self.assertTrue(updated['tutorial_seen'])
+        self.assertEqual(updated['revision'], original['revision'])
+        self.assertEqual(updated['files'], original['files'])
+        saved = self.store.save(original)
+        self.assertTrue(saved['tutorial_seen'])
+        reset = self.store.save({'revision': saved['revision']}, reset=True)
+        self.assertTrue(reset['tutorial_seen'])
+
     def test_rejects_extra_paths_oversized_files_and_invalid_stages(self):
         state = self.store.read()
         for files in ({'../x': 'bad'}, {**state['files'], 'secret.txt': 'x'}, {**state['files'], 'script.js': 'a' * (128*1024+1)}):
