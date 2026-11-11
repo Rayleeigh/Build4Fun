@@ -30,10 +30,31 @@ replaces the name Hack4Fun; its placeholder directories retain their legacy path
 The [Code4Fun plan](code4fun/plan.md) defines one progressively developed server
 dashboard, six frontend learning stages, and a separate prepared API container.
 
-Run commands from the repository root. The root Dockerfile, Compose file,
-and requirements continue to build Build4Fun. `compose.code4fun.yaml` starts the
-Code4Fun workspace and prepared API as a separate stack on ports 8090 and 8091.
-GitHub checks validate both applications independently.
+## Application build and launch layout
+
+Each application owns its Dockerfiles and Python requirements under `apps/`.
+Root-level `compose.<application>.yaml` files launch independent stacks. Build
+contexts stay at the repository root when images need shared challenge content;
+additional services may use app-local contexts, such as Code4Fun's API.
+
+| Application | Main Dockerfile | Dependencies | Root Compose file |
+| --- | --- | --- | --- |
+| Build4Fun | `apps/build4fun/Dockerfile` | `apps/build4fun/requirements.txt` | `compose.build4fun.yaml` |
+| Code4Fun | `apps/code4fun/Dockerfile` | `apps/code4fun/workspace/requirements.txt` | `compose.code4fun.yaml` |
+
+Run commands from the repository root:
+
+```sh
+docker compose -f compose.build4fun.yaml up --build -d --wait
+docker compose -f compose.code4fun.yaml up --build -d --wait
+```
+
+Build4Fun uses port 8080; Code4Fun uses ports 8090 and 8091. Their Compose project
+names remain `build4fun` and `code4fun`. Renaming the Build4Fun launch file does
+not change its service name, image tag, workspace mount, or Docker ownership.
+There is no default root `compose.yaml` or root Dockerfile; select the application
+explicitly with `-f`. GitHub checks validate both applications independently.
+
 Existing workspace locations, environment variables, deployment ownership,
 and public `/docs/challenges/` URLs remain compatible. Lesson files now live in
 `challenges/build/`; only that directory feeds the current challenge catalog.

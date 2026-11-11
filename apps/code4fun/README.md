@@ -16,7 +16,7 @@ docker compose -f compose.code4fun.yaml up --build -d --wait
 
 Open http://localhost:8090. Port 8091 serves the isolated preview and API proxy.
 The first build installs Chromium for behavior checks and can take a few minutes.
-Build4Fun continues to use the root `compose.yaml` and port 8080 independently.
+Build4Fun uses `compose.build4fun.yaml` and port 8080 independently.
 The Code4Fun API is a second service, reachable only through the workspace's
 preview proxy; it has no separately published host port.
 

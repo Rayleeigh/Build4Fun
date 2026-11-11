@@ -18,7 +18,7 @@ locations, and learning environments.
 
 ## Learning environments
 
-The root Dockerfile builds the Build4Fun controller. Code4Fun has a separate
+`apps/build4fun/Dockerfile` builds the Build4Fun controller. Code4Fun has a separate
 workspace image and prepared API container; neither receives Docker access.
 Crack4Fun sandboxes remain future work.
 
@@ -37,7 +37,7 @@ repository root:
 cp .env.example .env
 # Docker Desktop on macOS: set B4F_DOCKER_SOCKET in .env to
 # ${HOME}/.docker/run/docker.sock
-docker compose up --build -d --wait
+docker compose -f compose.build4fun.yaml up --build -d --wait
 ```
 
 Open http://localhost:8080. Compose stores projects in `.workspace/` by default
@@ -46,7 +46,7 @@ Docker socket to deploy apprentice environments, so run it in a trusted local
 learning environment.
 
 To apply application or template changes, rerun the Compose command above.
-Stop Build4Fun with `docker compose stop`; apprentice deployments remain running.
+Stop Build4Fun with `docker compose -f compose.build4fun.yaml stop`; apprentice deployments remain running.
 
 ### Install with docker pull
 

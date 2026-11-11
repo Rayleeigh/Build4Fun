@@ -20,10 +20,13 @@ commands from the repository root, with Docker Engine running:
 cp .env.example .env
 # On Docker Desktop for macOS, edit .env to use:
 # B4F_DOCKER_SOCKET=${HOME}/.docker/run/docker.sock
-docker compose up --build -d --wait
+docker compose -f compose.build4fun.yaml up --build -d --wait
 ```
 
-Open http://localhost:8080. The supplied Compose file publishes only to localhost.
+Open http://localhost:8080. `compose.build4fun.yaml` publishes only to localhost.
+Existing installations can use the new command directly with their existing
+`.env` and workspace. The Compose project name (`build4fun`), app service,
+and workspace mount are unchanged.
 Compose creates the workspace directory if it is missing. `.env` is ignored by
 Git; [`.env.example`](../../.env.example) documents the settings:
 
@@ -39,17 +42,17 @@ path. `localhost` is the browser hostname, not a valid workspace path.
 For a temporary UI-only container without Compose:
 
 ```sh
-docker build -t build4fun:local .
+docker build -f apps/build4fun/Dockerfile -t build4fun:local .
 docker run --rm -p 127.0.0.1:8080:8080 build4fun:local
 ```
 
 `EXPOSE 8080` in the image does not publish the port; `-p` makes it accessible.
 Use Compose for persistent workspace storage and Docker deployment controls.
-If startup fails, inspect `docker compose ps -a` and `docker compose logs app`.
+If startup fails, inspect `docker compose -f compose.build4fun.yaml ps -a` and `docker compose -f compose.build4fun.yaml logs app`.
 The health check reports whether the HTTP API is responding. It does not check
 apprentice service health. After changing application code or templates, run
-`docker compose up --build -d --wait` again. Editing `.env` requires recreating
-the container with `docker compose up -d --wait`.
+`docker compose -f compose.build4fun.yaml up --build -d --wait` again. Editing `.env` requires recreating
+the container with `docker compose -f compose.build4fun.yaml up -d --wait`.
 
 Compose supplies `B4F_PUBLIC_PORT` internally from `B4F_HTTP_PORT`; it does not
 need a separate entry in `.env`. Inside the container, `DOCKER_HOST` points to
@@ -57,7 +60,7 @@ need a separate entry in `.env`. Inside the container, `DOCKER_HOST` points to
 
 The socket grants control over the Docker host, so use this in the trusted local
 learning environment described in the [implementation guide](../../docs/build4fun/implementation.md). Stop the app with
-`docker compose stop`; this preserves its workspace and apprentice deployments.
+`docker compose -f compose.build4fun.yaml stop`; this preserves its workspace and apprentice deployments.
 
 ## Run with Python
 
@@ -65,7 +68,7 @@ From the repository root, with Python 3.9 or newer:
 
 ```sh
 python3 -m venv .venv
-.venv/bin/python -m pip install -r requirements.txt
+.venv/bin/python -m pip install -r apps/build4fun/requirements.txt
 .venv/bin/python apps/build4fun/application/server.py
 ```
 
@@ -318,7 +321,7 @@ Browser tests use a simulated Engine for lifecycle actions.
 To check the built container image, including its HTTP API and Host/Origin checks:
 
 ```sh
-docker build -t build4fun-local-check .
+docker build -f apps/build4fun/Dockerfile -t build4fun-local-check .
 .venv/bin/python apps/build4fun/tests/container_smoke.py
 ```
 

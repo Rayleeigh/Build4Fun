@@ -8,9 +8,9 @@ See the [user guide](../../apps/build4fun/README.md) for installation and comman
 
 ## Runtime and installation
 
-The [Dockerfile](../../Dockerfile) builds an image containing Python, the application,
+The [Dockerfile](../../apps/build4fun/Dockerfile) builds an image containing Python, the application,
 block templates, the Docker CLI, and the Compose plugin. The server listens on
-`0.0.0.0:8080` inside the container. [compose.yaml](../../compose.yaml) publishes that
+`0.0.0.0:8080` inside the container. [compose.build4fun.yaml](../../compose.build4fun.yaml) publishes that
 port on `127.0.0.1`, mounts the workspace at `/workspace`, and mounts the host
 Docker socket. Apprentice containers run on the host Engine alongside Build4Fun.
 The health check requests the application's HTTP API.

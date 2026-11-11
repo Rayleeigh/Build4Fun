@@ -10,7 +10,7 @@ covers launch commands, API responses, persistence, and limitations. The origina
 Playwright, and Chromium. The API image contains only the standard-library Python
 server. Both run as the code4fun user without Docker access. The workspace exposes
 localhost ports 8090 (management UI) and 8091 (preview); the API listens internally
-on 8092. Build4Fun's Dockerfile and default Compose workflow remain independent.
+on 8092. Build4Fun uses its own app Dockerfile and `compose.build4fun.yaml` stack.
 
 | Source | Responsibility |
 | --- | --- |
