@@ -9,23 +9,25 @@ directories. Build4Fun and Code4Fun are runnable local applications. Crack4Fun r
 | `apps/build4fun/templates/` | Compose block definitions |
 | `apps/build4fun/tests/` | Build4Fun unit, browser, and Docker checks |
 | `apps/code4fun/` | Coding workspace, prepared API, image builds, and tests |
-| `apps/hack4fun/` | Crack4Fun placeholder; legacy directory name |
+| `apps/crack4fun/` | CTF workspace, sandbox agents, portal, and tests |
 | `challenges/build/` | Existing Compose lessons and configuration checks |
 | `challenges/code/` | Six progressive coding stages and starter files |
-| `challenges/hack/` | Crack4Fun challenge placeholder; legacy directory name |
+| `challenges/crack/` | Four public CTF program catalogs |
 | `docs/monorepo.md` | Shared repository architecture |
 | `docs/naming-and-colours.md` | Application names, identity colours, and usage |
 | `docs/build4fun/` | Build4Fun purpose, implementation, and images |
 | `docs/code4fun/` | Code4Fun plan and implementation documentation |
+| `docs/crack4fun/` | Crack4Fun scenario and filesystem planning |
 
 Documentation follows the application boundaries: shared repository guidance
 stays directly under `docs/`, and application-specific documents live under
-`docs/<application>/`. Keep images with the documentation that uses them. Add
-Crack4Fun documentation under `docs/crack4fun/` when its planning begins.
+`docs/<application>/`. Keep images with the documentation that uses them. The
+[Crack4Fun file plan](crack4fun/files-plan.md) defines four CTF programs, their artifact trails,
+flag convention, and sandbox, portal, and repository layout.
 
 The [naming and colour convention](naming-and-colours.md) defines Build4Fun blue
 (`#0000B4`), Code4Fun green (`#00C400`), and Crack4Fun red (`#C40000`). Crack4Fun
-replaces the name Hack4Fun; its placeholder directories retain their legacy paths.
+replaces the name Hack4Fun; its application and catalog use `crack4fun` and `crack` paths.
 
 The [Code4Fun plan](code4fun/plan.md) defines one progressively developed server
 dashboard, six frontend learning stages, and a separate prepared API container.
@@ -41,19 +43,21 @@ additional services may use app-local contexts, such as Code4Fun's API.
 | --- | --- | --- | --- |
 | Build4Fun | `apps/build4fun/Dockerfile` | `apps/build4fun/requirements.txt` | `compose.build4fun.yaml` |
 | Code4Fun | `apps/code4fun/Dockerfile` | `apps/code4fun/workspace/requirements.txt` | `compose.code4fun.yaml` |
+| Crack4Fun | `apps/crack4fun/Dockerfile` | stdlib controller; `apps/crack4fun/sandbox/requirements.txt` | `compose.crack4fun.yaml` |
 
 Run commands from the repository root:
 
 ```sh
 docker compose -f compose.build4fun.yaml up --build -d --wait
 docker compose -f compose.code4fun.yaml up --build -d --wait
+docker compose -f compose.crack4fun.yaml up --build -d --wait
 ```
 
-Build4Fun uses port 8080; Code4Fun uses ports 8090 and 8091. Their Compose project
+Build4Fun uses port 8080; Code4Fun uses ports 8090 and 8091; Crack4Fun uses 8100 and 8101. Their Compose project
 names remain `build4fun` and `code4fun`. Renaming the Build4Fun launch file does
 not change its service name, image tag, workspace mount, or Docker ownership.
 There is no default root `compose.yaml` or root Dockerfile; select the application
-explicitly with `-f`. GitHub checks validate both applications independently.
+explicitly with `-f`. GitHub checks validate all three applications independently.
 
 Existing workspace locations, environment variables, deployment ownership,
 and public `/docs/challenges/` URLs remain compatible. Lesson files now live in
@@ -68,5 +72,5 @@ Repository boundaries do not define runtime isolation. Learner code and CTF
 sandboxes must run separately from the controller, without its Docker access.
 Individual sessions and stronger isolation are required before shared hosting.
 Code4Fun's separate-origin preview and controlled browser checks are documented
-in its [implementation guide](code4fun/implementation.md). Crack4Fun and a browser
-terminal remain future work.
+in its [implementation guide](code4fun/implementation.md). Crack4Fun's real browser terminals and local sandbox boundaries are documented
+in its [implementation guide](crack4fun/implementation.md).

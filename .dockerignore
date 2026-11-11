@@ -3,6 +3,7 @@
 apps/*
 !apps/build4fun/
 !apps/code4fun/
+!apps/crack4fun/
 apps/build4fun/*
 !apps/build4fun/Dockerfile
 !apps/build4fun/requirements.txt
@@ -12,5 +13,6 @@ apps/build4fun/*
 challenges/*
 !challenges/build/
 !challenges/code/
+!challenges/crack/
 **/__pycache__/
 **/*.pyc

@@ -1,0 +1,50 @@
+{
+  "id": "filesystem",
+  "title": "Filesystem",
+  "difficulty": "Simple",
+  "prefix": "fs",
+  "description": "Follow the administrator’s handover through a real Linux filesystem.",
+  "start": "/home/apprentice/README.txt",
+  "challenges": [
+    {
+      "id": "fs-01",
+      "title": "Hidden in the handover",
+      "goal": "Find the hidden maintenance note in your documents directory.",
+      "hints": [
+        "Use pwd to check where you are. ls normally hides names starting with a dot.",
+        "Try ls -la ~/documents, then use cat to read the hidden note."
+      ],
+      "difficulty": "Simple"
+    },
+    {
+      "id": "fs-02",
+      "title": "A line in the logs",
+      "goal": "The handover names an event in /var/log/portal/maintenance.log. Find its flag.",
+      "hints": [
+        "Read ~/notes/handover.txt first.",
+        "grep searches a text file for a word or phrase; less lets you browse it."
+      ],
+      "difficulty": "Simple"
+    },
+    {
+      "id": "fs-03",
+      "title": "The previous administrator",
+      "goal": "Inspect the history file, become root with the planted credential, and read /root/flag.txt.",
+      "hints": [
+        "Find hidden files in your home directory. The planted history is .bash_history; your ongoing history is stored separately.",
+        "Use su - to become root. Password input is intentionally not echoed. id shows your current user."
+      ],
+      "difficulty": "Simple"
+    },
+    {
+      "id": "fs-04",
+      "title": "Close the incident",
+      "goal": "Follow /root/closure-note.txt to the matching inventory record.",
+      "hints": [
+        "/root is root’s home; / is the filesystem root.",
+        "Read the named record in /home/apprentice/documents/inventory.txt."
+      ],
+      "difficulty": "Simple"
+    }
+  ]
+}

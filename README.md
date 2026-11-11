@@ -10,8 +10,8 @@ the images, ports, paths, and settings themselves.
 ## Monorepo
 
 This repository contains Build4Fun, Code4Fun (an interactive frontend coding
-workspace), and a placeholder for Crack4Fun (a beginner CTF learning experience).
-Build4Fun and Code4Fun run independently.
+workspace), and Crack4Fun (a hands-on CTF learning environment).
+All three applications run independently.
 
 See [repository architecture](docs/monorepo.md) for module boundaries, challenge
 locations, and learning environments.
@@ -20,7 +20,7 @@ locations, and learning environments.
 
 `apps/build4fun/Dockerfile` builds the Build4Fun controller. Code4Fun has a separate
 workspace image and prepared API container; neither receives Docker access.
-Crack4Fun sandboxes remain future work.
+Crack4Fun has separate learner sandboxes and a prepared portal, without Docker access.
 
 Learner environments must not receive the controller's Docker socket, workspace,
 or host filesystem mounts. Before introducing execution, define resource limits,
@@ -63,6 +63,17 @@ docker compose -f compose.code4fun.yaml up --build -d --wait
 Open http://localhost:8090 to build My Server Dashboard through six progressive
 HTML, CSS, JavaScript, and API stages. See the [Code4Fun guide](apps/code4fun/README.md)
 for API details, saved work, and checks. The first build includes Chromium.
+
+### Run Crack4Fun
+
+```sh
+docker compose -f compose.crack4fun.yaml up --build -d --wait
+```
+
+Open http://localhost:8100 for Filesystem, Forensics, Network Analysis, and
+Web/API: four programs with 17 flags, real browser terminals, and saved progress.
+The first build compiles John and downloads RockYou. See the
+[Crack4Fun guide](apps/crack4fun/README.md) for setup, tools, resets, and boundaries.
 
 ## Features
 

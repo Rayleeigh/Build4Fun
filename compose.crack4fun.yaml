@@ -1,0 +1,125 @@
+name: crack4fun
+x-agent: &agent
+  image: crack4fun-sandbox:local
+  build:
+    context: .
+    dockerfile: apps/crack4fun/sandbox/Dockerfile
+  init: true
+  cap_drop: [ALL]
+  cap_add: [SETUID, SETGID, CHOWN, DAC_OVERRIDE, FOWNER, KILL, AUDIT_WRITE]
+  pids_limit: 128
+  mem_limit: 768m
+  cpus: 1
+  healthcheck:
+    test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9000/health', timeout=3).read()"]
+    interval: 10s
+    timeout: 5s
+    start_period: 10s
+    retries: 5
+services:
+  workspace:
+    build:
+      context: .
+      dockerfile: apps/crack4fun/Dockerfile
+    ports:
+      - "127.0.0.1:${CRACK_HTTP_PORT:-8100}:8100"
+    environment:
+      CRACK_HTTP_PORT: ${CRACK_HTTP_PORT:-8100}
+      CRACK_PORTAL_PORT: ${CRACK_PORTAL_PORT:-8101}
+      CRACK_UI_HOST: workspace-ui
+    volumes:
+      - workspace:/workspace
+      - control-fs:/controls/filesystem
+      - control-fo:/controls/forensics
+      - control-net:/controls/network-analysis
+      - control-web:/controls/web-api
+      - control-portal:/controls/portal
+    networks:
+      ui:
+        aliases: [workspace-ui]
+      fs: {}
+      fo: {}
+      net: {}
+      web: {}
+    depends_on:
+      filesystem: {condition: service_healthy}
+      forensics: {condition: service_healthy}
+      network: {condition: service_healthy}
+      web-terminal: {condition: service_healthy}
+      portal: {condition: service_healthy}
+    init: true
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    cap_add: [CHOWN, FOWNER, DAC_OVERRIDE, SETUID, SETGID]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 64
+    mem_limit: 256m
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; r=urllib.request.Request('http://workspace-ui:8100/api/state',headers={'Host':'127.0.0.1:8100'}); urllib.request.urlopen(r,timeout=3).read()"]
+      interval: 10s
+      timeout: 5s
+      start_period: 10s
+      retries: 5
+  filesystem:
+    <<: *agent
+    hostname: workstation
+    environment: {CRACK_PROGRAM: filesystem}
+    volumes: ["control-fs:/control:ro"]
+    networks: [fs]
+  forensics:
+    <<: *agent
+    hostname: evidence-lab
+    environment: {CRACK_PROGRAM: forensics}
+    volumes: ["control-fo:/control:ro"]
+    security_opt: [no-new-privileges:true]
+    networks: [fo]
+    mem_limit: 1024m
+    cpus: 2
+  network:
+    <<: *agent
+    hostname: capture-lab
+    environment: {CRACK_PROGRAM: network-analysis}
+    volumes: ["control-net:/control:ro"]
+    security_opt: [no-new-privileges:true]
+    networks: [net]
+  web-terminal:
+    <<: *agent
+    hostname: web-lab
+    environment: {CRACK_PROGRAM: web-api}
+    volumes: ["control-web:/control:ro"]
+    security_opt: [no-new-privileges:true]
+    networks: [web]
+  portal:
+    build:
+      context: .
+      dockerfile: apps/crack4fun/portal/Dockerfile
+    hostname: portal
+    ports:
+      - "127.0.0.1:${CRACK_PORTAL_PORT:-8101}:8080"
+    volumes: ["control-portal:/control:ro"]
+    networks: [web, portal-public]
+    init: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 32
+    mem_limit: 128m
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9000/health',timeout=3).read()"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+networks:
+  ui: {}
+  portal-public: {}
+  fs: {internal: true}
+  fo: {internal: true}
+  net: {internal: true}
+  web: {internal: true}
+volumes:
+  workspace:
+  control-fs:
+  control-fo:
+  control-net:
+  control-web:
+  control-portal:

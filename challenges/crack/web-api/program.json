@@ -1,0 +1,50 @@
+{
+  "id": "web-api",
+  "title": "Web/API",
+  "difficulty": "Simple",
+  "prefix": "web",
+  "description": "Explore the Apprentice Portal and work with its prepared HTTP API.",
+  "start": "http://portal:8080",
+  "challenges": [
+    {
+      "id": "web-01",
+      "title": "Read the source",
+      "goal": "Inspect the homepage source to find a comment and the first flag.",
+      "hints": [
+        "Use the portal preview or curl http://portal:8080/ from this terminal.",
+        "HTML comments are present in the source even though the browser does not display them."
+      ],
+      "difficulty": "Simple"
+    },
+    {
+      "id": "web-02",
+      "title": "What the style hides",
+      "goal": "Find the notice hidden by the portal stylesheet.",
+      "hints": [
+        "Inspect styles.css and the HTML element it targets.",
+        "CSS changes visibility, not whether text exists in the response."
+      ],
+      "difficulty": "Simple"
+    },
+    {
+      "id": "web-03",
+      "title": "Ask for the archive",
+      "goal": "Discover the API description and JavaScript request clue. Retrieve the training archive using its query parameter and required header.",
+      "hints": [
+        "Read /app.js and GET /api/info on the portal.",
+        "curl -H sets a request header. The API description documents the department query parameter."
+      ],
+      "difficulty": "Simple"
+    },
+    {
+      "id": "web-04",
+      "title": "Dispatch the kit",
+      "goal": "Send a supported training-kit action as JSON to the dispatch endpoint.",
+      "hints": [
+        "Read the archive response for the parcel and action values.",
+        "curl -X POST -H \"Content-Type: application/json\" -d '{\"parcel\":\"VALUE\",\"action\":\"VALUE\"}' URL sends a JSON body. Check the API’s response status and message."
+      ],
+      "difficulty": "Simple"
+    }
+  ]
+}

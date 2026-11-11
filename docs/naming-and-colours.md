@@ -8,7 +8,7 @@ names for technical identifiers.
 | --- | --- | --- | --- |
 | Build4Fun | B4 | Blue · `#0000B4` | Assemble and understand application environments. |
 | Code4Fun | C4 | Green · `#00C400` | Build a frontend progressively with HTML, CSS, JavaScript, and a prepared API. |
-| Crack4Fun | C4 | Red · `#C40000` | Explore beginner web puzzles and capture-the-flag challenges. |
+| Crack4Fun | C4 | Red · `#C40000` | Solve filesystem, forensics, network-analysis, and web/API CTF programs. |
 
 ## Relationship between names and colours
 
@@ -31,7 +31,7 @@ remains the value in the table. Preserve semantic colours for errors and success
 rather than making every status match the application's identity.
 
 Build4Fun uses its blue accent and Code4Fun uses its green accent. Crack4Fun's
-red applies when its interface is implemented.
+red is used for its interface accents.
 
 ## Crack4Fun naming
 
@@ -39,13 +39,17 @@ red applies when its interface is implemented.
 clues”**, and its description is **“Beginner web puzzles and capture-the-flag
 challenges.”**
 
-Apprentices explore prepared websites, inspect HTML, CSS, and JavaScript, use
-curl to understand API endpoints, and retrieve flags. The name refers to solving
-clues; password cracking, brute forcing, and breaking encryption are outside the
-intended curriculum.
+Apprentices follow clues through four programs: Filesystem (simple), Forensics
+(simple to advanced), Network Analysis (simple), and Web/API (simple). Forensics
+includes real offline dictionary cracking of a deliberately weak fictional
+account hash using RockYou, along with hex-dump and artifact analysis. Other
+programs cover Linux files, prepared packet captures, websites, and API requests.
 
-Use `crack4fun` for new application identifiers and `docs/crack4fun/` for future
-application documentation. The existing placeholder directories
-`apps/hack4fun/` and `challenges/hack/` retain their current paths until a separate
-repository rename; they now refer to Crack4Fun. Documenting this convention does
-not rename directories or change launch commands.
+The theme remains "Crack the clues." The scope now includes supplied hash
+cracking exercises; it does not imply attacks on outside systems. See the
+[program and file plan](crack4fun/files-plan.md) for artifacts and the `{FLAG}`
+brace-only flag convention.
+
+Use `crack4fun` for application identifiers and `docs/crack4fun/` for application
+documentation. Runtime files live in `apps/crack4fun/` and public challenge catalogs
+in `challenges/crack/`. The former Hack4Fun placeholders have been renamed.
