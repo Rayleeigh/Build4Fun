@@ -54,7 +54,7 @@ All jobs use the same prepared source revision. Stable releases update version
 and `latest` tags; prereleases update only the version tag. Manual dispatch can
 publish an explicit version from a selected branch, optionally updating `latest`.
 Image-scoped Buildx caches avoid sharing incompatible build caches. Builds target
-Linux AMD64. See [publishing images](../releases.md) for operation and image paths.
+Linux AMD64 and ARM64. See [publishing images](../releases.md) for operation and image paths.
 
 Unit tests exercise every service mapping, build removal, preserved settings,
 action/tag validation, conflicting jobs, non-destructive stop, failure reporting,
@@ -63,3 +63,17 @@ actions to verify local/GHCR choice, tag forwarding, activity, app links, and
 responsive views. `docker_smoke.py` actually starts an isolated Build4Fun project,
 checks HTTP, and stops it; `--registry` also pulls the released GHCR image. Its
 project and workspace are independent of the normal learning stacks.
+
+## Architecture selection
+
+Each app card requires an explicit ARM64 or AMD64 selection before starting.
+The info dialog explains common devices, the 64-bit Raspberry Pi OS requirement,
+and emulation. `POST /api/action` validates `architecture` for start actions;
+stopping remains available without an architecture selection.
+
+The manager writes `platform: linux/<selection>` on every service for both local
+builds and GHCR launches. Local mode uses a generated configuration preserving
+absolute build contexts and mounts. Registry mode inspects each distinct image
+and rejects a missing selected architecture before pulling. There is no automatic
+fallback. New release images include both architectures; older AMD64-only tags
+require explicit AMD64 selection and compatible emulation on ARM64 hosts.

@@ -354,7 +354,7 @@ then runs unit, browser, Docker lifecycle, and container checks. The temporary
 container is removed after the run; this hosting step is for validation.
 
 Only a successful run publishes the same tested image to
-`ghcr.io/rayleeigh/build4fun:<release-tag>`. Stable releases also update `latest`;
+`ghcr.io/rayleeigh/educate4fun:<release-tag>`. Stable releases also update `latest`;
 prereleases publish only their release tag. Authentication uses `GITHUB_TOKEN`
 with `packages: write`, so no Docker Hub credentials are required. Package
 visibility is managed through GitHub Packages settings. The workflow currently

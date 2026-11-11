@@ -12,10 +12,10 @@ from playwright.sync_api import sync_playwright, expect
 
 class Fixture:
     def __init__(self):
-        self.calls=[];self.state={'docker':None,'registry':'ghcr.io/rayleeigh/build4fun','jobs':{},'settings':{},'apps':[{**{k:item[k] for k in ('title','description','accent','port')},'id':app,'status':'stopped'} for app,item in APPS.items()]}
+        self.calls=[];self.state={'docker':None,'registry':'ghcr.io/rayleeigh/educate4fun','jobs':{},'settings':{},'apps':[{**{k:item[k] for k in ('title','description','accent','port')},'id':app,'status':'stopped'} for app,item in APPS.items()]}
     def snapshot(self):return copy.deepcopy(self.state)
-    def launch(self,app,action,source,tag):
-        self.calls.append((app,action,source,tag))
+    def launch(self,app,action,source,tag,architecture):
+        self.calls.append((app,action,source,tag,architecture))
         job={'running':False,'exit_code':0,'action':action,'source':source,'tag':tag,'log': 'Pulled image.\nReady.\n' if source=='registry' else 'Built image.\nReady.\n'}
         self.state['jobs'][app]=job
         next(a for a in self.state['apps'] if a['id']==app)['status']='running' if action=='start' else 'stopped'
@@ -31,14 +31,14 @@ def main():
             page.goto(f'http://127.0.0.1:{server.server_port}')
             expect(page.get_by_role('heading',name='What will you discover?')).to_be_visible()
             expect(page.locator('article')).to_have_count(3)
-            code=page.locator('.code4fun');code.get_by_label('Launch from').select_option('registry');code.get_by_label('Image tag').fill('v1.2.3')
+            code=page.locator('.code4fun');expect(code.get_by_role('button',name='Start',exact=True)).to_be_disabled();code.get_by_role('button',name='About CPU architectures').click();expect(page.get_by_role('heading',name='Choose your architecture')).to_be_visible();page.keyboard.press('Escape');code.get_by_label('Architecture',exact=True).select_option('arm64');code.get_by_label('Launch from').select_option('registry');code.get_by_label('Image tag').fill('v1.2.3')
             code.get_by_role('button',name='Start',exact=True).click();expect(page.locator('#logs')).to_be_visible()
             expect(page.locator('#log-output')).to_contain_text('Pulled image.')
             page.get_by_role('button',name='Close activity',exact=True).click();expect(code.get_by_role('link',name='Open app')).to_be_visible()
-            assert fixture.calls[-1]==('code4fun','start','registry','v1.2.3')
+            assert fixture.calls[-1]==('code4fun','start','registry','v1.2.3','arm64')
             code.get_by_role('button',name='Stop',exact=True).click();expect(page.locator('#logs')).to_be_visible();page.keyboard.press('Escape');expect(page.locator('#logs')).not_to_be_visible();expect(code.locator('.status')).to_have_text('Stopped')
-            build=page.locator('.build4fun');build.get_by_role('button',name='Start',exact=True).click();expect(page.locator('#log-output')).to_contain_text('Built image.')
-            assert fixture.calls[-1]==('build4fun','start','local','latest')
+            build=page.locator('.build4fun');build.get_by_label('Architecture',exact=True).select_option('amd64');build.get_by_role('button',name='Start',exact=True).click();expect(page.locator('#log-output')).to_contain_text('Built image.')
+            assert fixture.calls[-1]==('build4fun','start','local','latest','amd64')
             page.keyboard.press('Escape');page.screenshot(path='/tmp/fourfun-launcher-desktop.png',full_page=True)
             page.set_viewport_size({'width':390,'height':844})
             assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')

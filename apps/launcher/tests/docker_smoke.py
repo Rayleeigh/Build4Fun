@@ -31,9 +31,12 @@ def main():
         def command(app,path=None):
             result=original(app,path);result[result.index('-p')+1]=project;return result
         manager.command=command
+        host=subprocess.check_output(['docker','info','--format','{{.Architecture}}'],text=True).strip()
+        architecture={'aarch64':'arm64','x86_64':'amd64'}.get(host,host)
+        if args.registry:architecture='amd64' # Existing registry tags may predate ARM64 releases.
         try:
             for source in (['local','registry'] if args.registry else ['local']):
-                manager.launch('build4fun','start',source)
+                manager.launch('build4fun','start',source,architecture=architecture)
                 while manager.jobs['build4fun']['running']:time.sleep(.25)
                 job=manager.jobs['build4fun'];assert job['exit_code']==0,job['log']
                 with urlopen(f'http://127.0.0.1:{port}/api/projects') as response:assert json.load(response)==[]

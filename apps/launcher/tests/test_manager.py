@@ -22,28 +22,45 @@ class ManagerTests(unittest.TestCase):
     def test_registry_removes_builds_and_maps_every_service(self):
         for app, target in APPS.items():
             config = {'services': {service: {'build': {'context': '/repo'}, 'environment': {'KEEP': 'yes'}, 'volumes': ['work:/workspace']} for service in target['images']}}
-            with patch.object(self.manager, 'config', return_value=config): result = self.manager.registry_config(app, 'v1.2.3')
+            with patch.object(self.manager, 'config', return_value=config), patch('manager.subprocess.run', return_value=Mock(returncode=0, stdout='aarch64')), patch.object(self.manager, 'registry_platform', return_value='linux/amd64'):
+                result = self.manager.registry_config(app, 'v1.2.3', 'amd64')
             for service, suffix in target['images'].items():
                 item = result['services'][service]
                 self.assertNotIn('build', item)
-                self.assertEqual(item['image'], 'ghcr.io/rayleeigh/build4fun'+('/'+suffix if suffix else '')+':v1.2.3')
+                self.assertEqual(item['platform'], 'linux/amd64')
+                self.assertEqual(item['image'], 'ghcr.io/rayleeigh/educate4fun'+('/'+suffix if suffix else '')+':v1.2.3')
                 self.assertEqual(item['environment'], {'KEEP': 'yes'})
                 self.assertEqual(item['volumes'], ['work:/workspace'])
+
+    def test_platform_selection_honours_explicit_choice(self):
+        def result(architectures):
+            return Mock(returncode=0, stdout=json.dumps([{'Descriptor': {'platform': {'architecture': a}}} for a in architectures]))
+        with patch('manager.subprocess.run', return_value=result(['amd64', 'arm64'])):
+            self.assertEqual(self.manager.registry_platform('image', 'arm64'), 'linux/arm64')
+        with patch('manager.subprocess.run', return_value=result(['amd64'])):
+            with self.assertRaises(ValueError): self.manager.registry_platform('image', 'arm64')
+        with patch('manager.subprocess.run', return_value=result(['arm64'])):
+            with self.assertRaises(ValueError): self.manager.registry_platform('image', 'amd64')
 
     def test_actions_reject_paths_commands_invalid_tags_and_conflicts(self):
         for args in [('other','start'),('build4fun','rm'),('build4fun','start','shell'),('build4fun','start','registry','x;touch /tmp/bad')]:
             with self.assertRaises(ValueError): self.manager.launch(*args)
+        for arch in (None, '', 'ARM64', 'armv7', 'amd64;cmd'):
+            with self.assertRaises(ValueError): self.manager.launch('build4fun','start',architecture=arch)
         self.manager.jobs['build4fun'] = {'running': True}
         with self.assertRaises(ValueError): self.manager.launch('build4fun','start')
 
     def test_registry_and_local_use_distinct_commands(self):
         for source in ('local','registry'):
-            job={'source':source,'action':'start','tag':'latest','log':'','running':True}
-            with patch.object(self.manager,'run_command') as command, patch.object(self.manager,'registry_config',return_value={'services':{}}):
+            job={'source':source,'action':'start','tag':'latest','architecture':'arm64','log':'','running':True}
+            with patch.object(self.manager,'run_command') as command, patch.object(self.manager,'registry_config',return_value={'services':{}}), patch.object(self.manager,'config',return_value={'services': {'app': {'build': {'context': '/repo'}}}}):
                 self.manager.run('code4fun',job)
             calls=[call.args[0] for call in command.call_args_list]
             self.assertEqual(job['exit_code'],0)
-            if source=='local': self.assertIn('--build',calls[0]);self.assertEqual(len(calls),1)
+            if source=='local':
+                self.assertIn('--build',calls[0]);self.assertEqual(len(calls),1)
+                config=json.loads((self.manager.directory/'code4fun-local.json').read_text())
+                self.assertEqual(config['services']['app']['platform'], 'linux/arm64')
             else:
                 self.assertEqual(calls[0][-1],'pull');self.assertIn('--no-build',calls[1])
                 self.assertEqual(len(calls),2)
