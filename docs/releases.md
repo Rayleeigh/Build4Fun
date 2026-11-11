@@ -11,18 +11,21 @@ For this repository, replace `<version>` with a release tag such as `v1.2.3`:
 
 | Image | GHCR reference |
 | --- | --- |
-| Build4Fun | `ghcr.io/rayleeigh/build4fun:<version>` |
-| Code4Fun workspace | `ghcr.io/rayleeigh/build4fun/code4fun-workspace:<version>` |
-| Code4Fun API | `ghcr.io/rayleeigh/build4fun/code4fun-api:<version>` |
-| Crack4Fun workspace | `ghcr.io/rayleeigh/build4fun/crack4fun-workspace:<version>` |
-| Crack4Fun sandbox | `ghcr.io/rayleeigh/build4fun/crack4fun-sandbox:<version>` |
-| Crack4Fun portal | `ghcr.io/rayleeigh/build4fun/crack4fun-portal:<version>` |
-| Launcher | `ghcr.io/rayleeigh/build4fun/launcher:<version>` |
+| Build4Fun | `ghcr.io/rayleeigh/educate4fun:<version>` |
+| Code4Fun workspace | `ghcr.io/rayleeigh/educate4fun/code4fun-workspace:<version>` |
+| Code4Fun API | `ghcr.io/rayleeigh/educate4fun/code4fun-api:<version>` |
+| Crack4Fun workspace | `ghcr.io/rayleeigh/educate4fun/crack4fun-workspace:<version>` |
+| Crack4Fun sandbox | `ghcr.io/rayleeigh/educate4fun/crack4fun-sandbox:<version>` |
+| Crack4Fun portal | `ghcr.io/rayleeigh/educate4fun/crack4fun-portal:<version>` |
+| Launcher | `ghcr.io/rayleeigh/educate4fun/launcher:<version>` |
 
 Forks derive the namespace from their own GitHub repository. Build4Fun retains
 its original image reference; the launcher already uses these component paths.
 The shared sandbox image is built once in the publishing matrix and used by
-four distinct Crack4Fun containers. Builds currently target `linux/amd64`.
+four distinct Crack4Fun containers. New releases build both `linux/amd64` and `linux/arm64` using Buildx and QEMU.
+Older image tags may still be AMD64-only. The launcher requires the user to
+choose ARM64 or AMD64 and checks that the image supplies that architecture.
+Choosing a non-native architecture requires Docker emulation.
 
 ## Publish a release
 

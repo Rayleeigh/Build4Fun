@@ -44,7 +44,7 @@ def handler(manager, port):
                 if not 0 < length <= 4096: raise ValueError('Invalid request size')
                 data = json.loads(self.rfile.read(length))
                 if not isinstance(data, dict): raise ValueError('Expected a JSON object')
-                job = manager.launch(data.get('app'), data.get('action'), data.get('source', 'local'), data.get('tag', 'latest'))
+                job = manager.launch(data.get('app'), data.get('action'), data.get('source', 'local'), data.get('tag', 'latest'), data.get('architecture'))
                 self.reply(202, job)
             except (ValueError, TypeError) as error: self.reply(400, {'error': str(error)})
     return Handler

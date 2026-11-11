@@ -2,3 +2,4 @@
 /* Keep the card controls aligned when only one app shows an image tag. */
 .options{min-height:136px;align-content:start}.code4fun{--accent:#00c400}.code4fun .primary{color:#073000}.code4fun .open,.code4fun .symbol{color:#008000}
 @media(max-width:900px){.options{min-height:0}}
+.architecture-label{display:flex;align-items:center;gap:7px}.architecture-info{border:1px solid #b8b8be;border-radius:50%;width:16px;height:16px;padding:0;background:transparent;font:11px/14px Georgia,serif;color:#6e6e73}.architecture-copy{font-size:13px;line-height:1.8;color:#6e6e73}.architecture-copy dt{font-weight:600;color:#1d1d1f;margin-top:18px}.architecture-copy dd{margin:4px 0 0}.options{min-height:210px}@media(max-width:900px){.options{min-height:0}}

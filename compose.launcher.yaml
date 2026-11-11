@@ -10,7 +10,7 @@ services:
     environment:
       LAUNCHER_REPOSITORY: ${PWD}
       LAUNCHER_HTTP_PORT: ${LAUNCHER_HTTP_PORT:-8070}
-      FOURFUN_REGISTRY: ${FOURFUN_REGISTRY:-ghcr.io/rayleeigh/build4fun}
+      FOURFUN_REGISTRY: ${FOURFUN_REGISTRY:-ghcr.io/rayleeigh/educate4fun}
       B4F_HOST_WORKSPACE: ${B4F_HOST_WORKSPACE:-${PWD}/.workspace}
       B4F_DOCKER_SOCKET: ${B4F_DOCKER_SOCKET:-/var/run/docker.sock}
     volumes:

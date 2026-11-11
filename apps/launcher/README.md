@@ -39,7 +39,7 @@ Choose a tag compatible with the Compose definitions in your checkout.
 It never falls back to building when a pull fails. Review Activity for a missing
 tag, an unavailable package, or a failed health check.
 
-Default registry repository: `ghcr.io/rayleeigh/build4fun`. Set
+Default registry repository: `ghcr.io/rayleeigh/educate4fun`. Set
 `FOURFUN_REGISTRY` for a fork. Build4Fun retains its existing image path;
 components use child paths:
 
@@ -55,15 +55,22 @@ publishing of all seven images. The workflow publishes on a `v…` release and u
 `latest` for stable releases. Newly added packages must be published before
 GHCR mode can launch those apps. Configure package visibility as public for
 anonymous pulls from the launcher container. Publishing workflow changes does
-not itself publish images. The current workflow publishes Linux AMD64 images;
-other machines need compatible Docker emulation or locally built images.
+not itself publish images. New releases publish Linux AMD64 and ARM64 images. Before starting, choose
+**ARM64** or **AMD64** on the app card. The small information button explains
+the options: ARM64 for Apple Silicon and Raspberry Pi with a 64-bit OS; AMD64
+for most Intel/AMD PCs and Intel Macs. This choice applies to both local builds
+and registry images. Selecting a different architecture requires Docker
+emulation; the launcher never changes the selection automatically. An older
+AMD64-only tag cannot launch with ARM64 selected; use a newer native release,
+a local ARM64 build, or explicitly select AMD64 on a host supporting emulation.
+
 
 After the launcher image is published, its own bootstrap can also use GHCR:
 
 ```sh
 # The usual bootstrap above builds locally; to pull instead:
-docker pull ghcr.io/rayleeigh/build4fun/launcher:latest
-docker tag ghcr.io/rayleeigh/build4fun/launcher:latest fourfun-launcher:local
+docker pull ghcr.io/rayleeigh/educate4fun/launcher:latest
+docker tag ghcr.io/rayleeigh/educate4fun/launcher:latest fourfun-launcher:local
 docker compose -f compose.launcher.yaml up --no-build -d --wait
 ```
 

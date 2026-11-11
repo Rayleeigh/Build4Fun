@@ -23,7 +23,7 @@ class Manager:
     def __init__(self, root, state_dir, registry=None):
         self.root = Path(root).resolve()
         self.directory = Path(state_dir).resolve(); self.directory.mkdir(parents=True, exist_ok=True)
-        self.registry = registry or os.environ.get('FOURFUN_REGISTRY', 'ghcr.io/rayleeigh/build4fun')
+        self.registry = registry or os.environ.get('FOURFUN_REGISTRY', 'ghcr.io/rayleeigh/educate4fun')
         if not REGISTRY.fullmatch(self.registry) or '..' in self.registry: raise ValueError('FOURFUN_REGISTRY must be a GHCR repository path')
         self.lock = threading.RLock(); self.jobs = {}; self.settings = {}
         self.environment = {**os.environ, 'PWD': str(self.root), 'COMPOSE_ANSI': 'never', 'COMPOSE_PROGRESS': 'plain'}
@@ -37,22 +37,38 @@ class Manager:
         if result.returncode: raise ValueError(result.stderr.strip() or 'Could not read Compose configuration')
         return json.loads(result.stdout)
 
-    def registry_config(self, app, tag):
+    def registry_platform(self, image, architecture):
+        result = subprocess.run(['docker', 'manifest', 'inspect', '--verbose', image],
+                                env=self.environment, capture_output=True, text=True, timeout=45)
+        if result.returncode:
+            raise ValueError(result.stderr.strip() or 'Could not inspect registry image platforms')
+        manifests = json.loads(result.stdout)
+        if isinstance(manifests, dict): manifests = [manifests]
+        supported = {entry.get('Descriptor', {}).get('platform', {}).get('architecture') for entry in manifests}
+        if architecture in supported: return 'linux/' + architecture
+        raise ValueError('Image does not provide ' + architecture.upper() + '. Choose the other architecture or publish a release with this architecture.')
+
+    def registry_config(self, app, tag, architecture):
         config = self.config(app)
+        platforms = {}
         for service, suffix in APPS[app]['images'].items():
             item = config['services'][service]; item.pop('build', None)
             item['image'] = self.registry + ('/' + suffix if suffix else '') + ':' + tag
             item['pull_policy'] = 'always'
+            if item['image'] not in platforms:
+                platforms[item['image']] = self.registry_platform(item['image'], architecture)
+            item['platform'] = platforms[item['image']]
         return config
 
-    def launch(self, app, action, source='local', tag='latest'):
+    def launch(self, app, action, source='local', tag='latest', architecture=None):
         if app not in APPS: raise ValueError('Unknown application')
         if action not in ('start', 'stop'): raise ValueError('Choose Start or Stop')
         if source not in ('local', 'registry'): raise ValueError('Choose a local build or GHCR')
         if not isinstance(tag, str) or not TAG.fullmatch(tag): raise ValueError('Invalid image tag')
+        if action == 'start' and architecture not in ('arm64', 'amd64'): raise ValueError('Choose ARM64 or AMD64 before starting')
         with self.lock:
             if self.jobs.get(app, {}).get('running'): raise ValueError('An operation is already running for this application')
-            job = {'running': True, 'action': action, 'source': source, 'tag': tag, 'log': '', 'started': time.time(), 'exit_code': None}
+            job = {'running': True, 'action': action, 'source': source, 'tag': tag, 'architecture': architecture, 'log': '', 'started': time.time(), 'exit_code': None}
             self.jobs[app] = job
         threading.Thread(target=self.run, args=(app, job), daemon=True).start()
         return dict(job)
@@ -81,18 +97,22 @@ class Manager:
             if job['action'] == 'stop':
                 self.run_command(self.command(app) + ['stop', '--timeout', '20'], job)
             elif job['source'] == 'local':
-                self.append(job, 'Building from the local repository…\n')
-                self.run_command(self.command(app) + ['up', '--build', '--pull', 'missing', '-d', '--wait', '--wait-timeout', '180'], job)
+                config = self.config(app)
+                for item in config['services'].values(): item['platform'] = 'linux/' + job['architecture']
+                path = self.directory / (app + '-local.json')
+                path.write_text(json.dumps(config)); path.chmod(0o600)
+                self.append(job, 'Building ' + job['architecture'].upper() + ' from the local repository…\n')
+                self.run_command(self.command(app, path) + ['up', '--build', '--pull', 'missing', '-d', '--wait', '--wait-timeout', '180'], job)
             else:
                 path = self.directory / (app + '-registry.json')
-                path.write_text(json.dumps(self.registry_config(app, job['tag']))); path.chmod(0o600)
+                path.write_text(json.dumps(self.registry_config(app, job['tag'], job['architecture']))); path.chmod(0o600)
                 command = self.command(app, path)
                 self.append(job, 'Pulling ' + self.registry + ' images (' + job['tag'] + ')…\n')
                 self.run_command(command + ['pull'], job)
                 self.run_command(command + ['up', '--no-build', '--pull', 'never', '-d', '--wait', '--wait-timeout', '180'], job)
             with self.lock:
                 job['exit_code'] = 0
-                if job['action'] == 'start': self.settings[app] = {'source': job['source'], 'tag': job['tag']}
+                if job['action'] == 'start': self.settings[app] = {'source': job['source'], 'tag': job['tag'], 'architecture': job['architecture']}
             self.append(job, 'Ready.\n' if job['action'] == 'start' else 'Stopped. Saved work is kept.\n')
         except Exception as error:
             self.append(job, str(error) + '\n')

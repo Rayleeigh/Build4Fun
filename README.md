@@ -67,7 +67,7 @@ Stop Build4Fun with `docker compose -f compose.build4fun.yaml stop`; apprentice 
 ### Install with docker pull
 
 ```
-docker run --rm -p 127.0.0.1:8080:8080 ghcr.io/rayleeigh/build4fun:latest
+docker run --rm -p 127.0.0.1:8080:8080 ghcr.io/rayleeigh/educate4fun:latest
 ```
 
 ### Run Code4Fun
@@ -123,7 +123,7 @@ The first build compiles John and downloads RockYou. See the
 ## Releases
 
 Published GitHub releases with a `v` tag build and test the Docker image before
-publishing to `ghcr.io/rayleeigh/build4fun:<release-tag>`. Stable releases also
+publishing to `ghcr.io/rayleeigh/educate4fun:<release-tag>`. Stable releases also
 update `latest`. See [release image validation](apps/build4fun/README.md#release-images).
 
 ## License
