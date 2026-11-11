@@ -4,6 +4,7 @@ apps/*
 !apps/build4fun/
 !apps/code4fun/
 !apps/crack4fun/
+!apps/launcher/
 apps/build4fun/*
 !apps/build4fun/Dockerfile
 !apps/build4fun/requirements.txt

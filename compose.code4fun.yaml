@@ -1,6 +1,7 @@
 name: code4fun
 services:
   workspace:
+    image: code4fun-workspace:local
     build:
       context: .
       dockerfile: apps/code4fun/Dockerfile
@@ -33,6 +34,7 @@ services:
       start_period: 15s
       retries: 3
   api:
+    image: code4fun-api:local
     build: apps/code4fun/api
     hostname: code4fun-api
     init: true

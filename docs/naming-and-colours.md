@@ -53,3 +53,10 @@ brace-only flag convention.
 Use `crack4fun` for application identifiers and `docs/crack4fun/` for application
 documentation. Runtime files live in `apps/crack4fun/` and public challenge catalogs
 in `challenges/crack/`. The former Hack4Fun placeholders have been renamed.
+
+## Shared launcher
+
+The landing page is called **4Fun**, with `launcher` as its technical identifier.
+Its shared chrome uses neutral colours. Each app card retains its own identity:
+Build4Fun blue, Code4Fun green, and Crack4Fun red. The launcher manages their
+stacks; it is not another learning program.

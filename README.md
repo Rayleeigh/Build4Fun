@@ -9,7 +9,7 @@ the images, ports, paths, and settings themselves.
 
 ## Monorepo
 
-This repository contains Build4Fun, Code4Fun (an interactive frontend coding
+This repository contains a shared launcher, Build4Fun, Code4Fun (an interactive frontend coding
 workspace), and Crack4Fun (a hands-on CTF learning environment).
 All three applications run independently.
 
@@ -28,6 +28,22 @@ privileges, network access, and reset/cleanup behavior. A container alone is not
 a complete sandbox design. Code4Fun build files live under `apps/code4fun/`.
 
 ## Getting started
+
+### Open the launcher
+
+```sh
+cp .env.example .env # Skip this if .env is already configured.
+# Docker Desktop on macOS: set B4F_DOCKER_SOCKET in .env as shown in the example.
+docker compose -f compose.launcher.yaml up --build -d --wait
+```
+
+Open **http://localhost:8070** to start, stop, and open each learning app. Choose
+**Local build** or **GitHub Container Registry**, with live operation output.
+The launcher detects existing app stacks and keeps their saved work. Registry
+mode requires the selected release's component images to be published first.
+See the [launcher guide](apps/launcher/README.md).
+
+The applications can also be launched individually:
 
 ### Install with docker compose
 Install Docker with the Compose plugin and start the Docker Engine. From the
@@ -85,6 +101,8 @@ The first build compiles John and downloads RockYou. See the
 - Compose downloads and project ZIP exports.
 
 ## Documentation
+
+- [Publishing images](docs/releases.md): all seven GHCR images, release tags, and manual publishing.
 
 - [Naming and colours](docs/naming-and-colours.md): shared application identity and the Crack4Fun name.
 

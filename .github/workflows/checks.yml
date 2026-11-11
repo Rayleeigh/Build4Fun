@@ -50,3 +50,17 @@ jobs:
       - run: python -m pip install -r apps/build4fun/tests/requirements.txt
       - run: python -m playwright install --with-deps chromium
       - run: python apps/crack4fun/tests/container_smoke.py
+  launcher:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: docker compose -f compose.launcher.yaml config --quiet
+      - run: python -m unittest discover -s apps/launcher/tests -v
+      - run: python -m pip install -r apps/build4fun/tests/requirements.txt
+      - run: python -m playwright install --with-deps chromium
+      - run: python apps/launcher/tests/ui_smoke.py
+      - run: python apps/launcher/tests/docker_smoke.py
+      - run: docker build -f apps/launcher/Dockerfile -t fourfun-launcher:check .

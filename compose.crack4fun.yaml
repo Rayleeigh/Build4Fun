@@ -18,6 +18,7 @@ x-agent: &agent
     retries: 5
 services:
   workspace:
+    image: crack4fun-workspace:local
     build:
       context: .
       dockerfile: apps/crack4fun/Dockerfile
@@ -91,6 +92,7 @@ services:
     security_opt: [no-new-privileges:true]
     networks: [web]
   portal:
+    image: crack4fun-portal:local
     build:
       context: .
       dockerfile: apps/crack4fun/portal/Dockerfile
