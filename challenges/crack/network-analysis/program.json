@@ -1,0 +1,40 @@
+{
+  "id": "network-analysis",
+  "title": "Network Analysis",
+  "difficulty": "Simple",
+  "prefix": "net",
+  "description": "Investigate a short synthetic support capture. All traffic was prepared for this exercise.",
+  "start": "/evidence/network-analysis/README.txt",
+  "challenges": [
+    {
+      "id": "net-01",
+      "title": "Find the portal",
+      "goal": "Find the DNS answer for portal.training.test, then inspect its first HTTP response.",
+      "hints": [
+        "Read topology.txt and open support-session.pcap with tshark -r.",
+        "Use a display filter with -Y dns or -Y http. No live capture is needed."
+      ],
+      "difficulty": "Simple"
+    },
+    {
+      "id": "net-02",
+      "title": "Follow the conversation",
+      "goal": "Locate the HTTP response header that carries the next flag.",
+      "hints": [
+        "Use tshark -r /evidence/network-analysis/support-session.pcap -Y http -V to inspect HTTP details.",
+        "You can follow a TCP stream with tshark -r FILE -q -z follow,tcp,ascii,STREAM_NUMBER."
+      ],
+      "difficulty": "Simple"
+    },
+    {
+      "id": "net-03",
+      "title": "Reassemble the handover",
+      "goal": "Export the handover text file transferred over HTTP and read its flag.",
+      "hints": [
+        "HTTP data may span packets; object export reassembles it.",
+        "Create a directory in /work and use tshark -r FILE --export-objects http,/work/exported. These deliberately plaintext HTTP examples do not imply HTTPS can normally be read this way."
+      ],
+      "difficulty": "Simple"
+    }
+  ]
+}

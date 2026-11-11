@@ -1,0 +1,71 @@
+{
+  "id": "forensics",
+  "title": "Forensics",
+  "difficulty": "Simple → Advanced",
+  "prefix": "fo",
+  "description": "Recover an incident bundle through hex, signatures, metadata, extraction, and real offline password recovery.",
+  "start": "/evidence/forensics/README.txt",
+  "challenges": [
+    {
+      "id": "fo-01",
+      "title": "Read the bytes",
+      "goal": "Inspect 01-message.hex and recover the flag encoded in its bytes.",
+      "hints": [
+        "The right-hand column shows ASCII. Curly braces have hex values 7b and 7d.",
+        "xxd -r /evidence/forensics/01-message.hex reconstructs the original bytes."
+      ],
+      "difficulty": "Simple"
+    },
+    {
+      "id": "fo-02",
+      "title": "An unreliable extension",
+      "goal": "Identify 02-recovered.dat by its contents and inspect the embedded text.",
+      "hints": [
+        "file identifies signatures rather than trusting extensions.",
+        "After identifying the image format, strings can reveal readable text chunks."
+      ],
+      "difficulty": "Simple"
+    },
+    {
+      "id": "fo-03",
+      "title": "Behind the photograph",
+      "goal": "Inspect the metadata of 03-workshop-photo.jpg.",
+      "hints": [
+        "Image metadata can contain text that is not visible in the image.",
+        "exiftool /evidence/forensics/03-workshop-photo.jpg lists its metadata."
+      ],
+      "difficulty": "Intermediate"
+    },
+    {
+      "id": "fo-04",
+      "title": "Inside the bundle",
+      "goal": "Recover the ZIP embedded in 04-support-bundle.bin and read its note.",
+      "hints": [
+        "Look for a ZIP signature with binwalk or xxd. Work in /work rather than changing evidence.",
+        "The bundle header records the offset. Use dd to copy from that byte into /work/support.zip, then unzip it."
+      ],
+      "difficulty": "Intermediate"
+    },
+    {
+      "id": "fo-05",
+      "title": "Recover the weak password",
+      "goal": "Use the supplied SHA-256 hash and RockYou to recover the archive password, open 06-records.zip, and read its recovery note.",
+      "hints": [
+        "This is a deliberately weak fictional account. A fast unsalted SHA-256 hash is not suitable password storage.",
+        "Use john --format=raw-sha256 --wordlist=/wordlists/rockyou.txt /evidence/forensics/05-account.sha256. john --show --format=raw-sha256 shows recovered results.",
+        "Extract the ZIP in /work with unzip. It asks for the recovered password; the password itself is not the flag."
+      ],
+      "difficulty": "Advanced"
+    },
+    {
+      "id": "fo-06",
+      "title": "Follow the evidence",
+      "goal": "Correlate the event log and records in the unlocked archive to recover the last flag.",
+      "hints": [
+        "Read recovery-note.txt for the relevant incident timestamp, then find its record ID in events.log.",
+        "Find that ID in records.csv. Its payload is Base64; decode the matching value with base64 -d."
+      ],
+      "difficulty": "Advanced"
+    }
+  ]
+}

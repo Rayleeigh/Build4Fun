@@ -1,0 +1,5 @@
+body { font-family: sans-serif; background: #edf6f0; color: #183039; padding: 24px; }
+body.dark { background: #183039; color: #edf6f0; }
+#server-info { padding: 16px; border: 1px solid #80a491; border-radius: 10px; }
+button { padding: 8px; margin: 4px; cursor: pointer; }
+dd { margin-bottom: 10px; }

@@ -1,0 +1,238 @@
+[
+  {
+    "title": "Give your dashboard structure",
+    "focus": "Basic HTML",
+    "goal": "Introduce your dashboard and make room for server information.",
+    "steps": [
+      "Add a non-empty h1 and a paragraph introducing your dashboard.",
+      "Add a section with id=server-info containing a heading (h2)."
+    ],
+    "hints": [
+      {
+        "title": "1. Give content meaning",
+        "text": "Write HTML inside the existing <body>. Most elements have an opening tag, content, and a closing tag. Here is a different page:",
+        "code": "<h1>My recipe book</h1>\n<p>Recipes I want to try.</p>",
+        "task": "Choose your own dashboard heading and introduction. Which tag describes each piece of text?",
+        "language": "html"
+      },
+      {
+        "title": "2. Group related information",
+        "text": "A section groups related content. Its h2 heading introduces that group; h1 names the whole page.",
+        "code": "<section id=\"recipes\">\n  <h2>Favourite recipes</h2>\n</section>",
+        "task": "Adapt this structure for server information. Use the section ID requested in your mission, not recipes.",
+        "language": "html"
+      },
+      {
+        "title": "3. Connect IDs to later work",
+        "text": "An id is a unique name for one element. CSS and JavaScript can use it to find that element.",
+        "code": "<p id=\"recipe-count\">No recipes yet.</p>",
+        "task": "Keep IDs unique. Check that your section contains its heading, rather than placing the heading after the closing section tag.",
+        "language": "html"
+      }
+    ],
+    "checks": [
+      "A page heading",
+      "An introduction",
+      "A server information section with a heading"
+    ]
+  },
+  {
+    "title": "Make it your own",
+    "focus": "HTML + CSS",
+    "goal": "Turn your server section into a readable information card.",
+    "steps": [
+      "In style.css, give the body a background color other than transparent or white.",
+      "Give #server-info at least 12px padding and a visible border with width of at least 1px."
+    ],
+    "hints": [
+      {
+        "title": "1. Match a selector to an element",
+        "text": "Put CSS rules in style.css. A tag selector matches every element of that type; # followed by an ID matches one element.",
+        "code": "p {\n  color: #315b50;\n}\n\n#recipe-card {\n  background-color: #fff4df;\n}",
+        "task": "Which selector matches the whole page? Which matches your server information section? Choose your own background color.",
+        "language": "css"
+      },
+      {
+        "title": "2. Make space inside a card",
+        "text": "Padding adds space between content and its border. Margin adds space outside the element. Values with px are lengths in pixels.",
+        "code": "#recipe-card {\n  padding: 8px;\n  margin: 16px;\n}",
+        "task": "Adapt the selector and choose padding that meets the mission’s minimum on every side. The example’s 8px is deliberately too small.",
+        "language": "css"
+      },
+      {
+        "title": "3. Draw a visible border",
+        "text": "The border shorthand combines a width, a line style, and a color. A width alone does not make a border visible.",
+        "code": "#recipe-card {\n  border: 2px dashed #547c68;\n}",
+        "task": "Try your own border style and color. Run the preview and check that you can see the card edge.",
+        "language": "css"
+      }
+    ],
+    "checks": [
+      "A colored page background",
+      "A padded server card",
+      "A visible card border"
+    ]
+  },
+  {
+    "title": "Add your first interaction",
+    "focus": "HTML + JavaScript",
+    "goal": "Use a button to change a message without reloading the page. Keep your CSS.",
+    "steps": [
+      "Add a button with id=greet and a visible text element with id=message.",
+      "In script.js, make clicking #greet change the text of #message to a non-empty greeting."
+    ],
+    "hints": [
+      {
+        "title": "1. Find an element from JavaScript",
+        "text": "Put JavaScript in script.js. querySelector uses CSS selector syntax. A # means an ID. The starter HTML loads this file with defer, so the page elements exist when it runs.",
+        "code": "const counter = document.querySelector(\"#recipe-count\");\nconsole.log(counter);",
+        "task": "Use your mission’s IDs. If the browser console shows null, check the spelling and whether the element exists in your HTML.",
+        "language": "javascript"
+      },
+      {
+        "title": "2. Listen for an action",
+        "text": "A click listener runs a function when someone clicks a button. Defining the listener does not perform the click.",
+        "code": "const button = document.querySelector(\"#add-recipe\");\n\nbutton.addEventListener(\"click\", () => {\n  console.log(\"The button was clicked!\");\n});",
+        "task": "Find your greeting button and attach a listener. What should happen inside that function?",
+        "language": "javascript"
+      },
+      {
+        "title": "3. Change what the page says",
+        "text": "textContent reads or replaces an element’s text. This example updates a recipe count, not a greeting.",
+        "code": "counter.textContent = \"One recipe added.\";",
+        "task": "Combine this idea with your click listener to update the message element. Compare the text before and after clicking.",
+        "language": "javascript"
+      }
+    ],
+    "checks": [
+      "The greeting button changes the message"
+    ]
+  },
+  {
+    "title": "Switch the atmosphere",
+    "focus": "HTML + CSS + JavaScript",
+    "goal": "Connect JavaScript state to CSS with a reversible theme switch.",
+    "steps": [
+      "Add a button with id=theme-toggle.",
+      "Make each click switch the body's computed background color. A second click must restore it."
+    ],
+    "hints": [
+      {
+        "title": "1. Let a class choose a style",
+        "text": "A class describes a reusable state or style. A selector like .highlighted applies only while that class is present.",
+        "code": ".highlighted {\n  color: #7b3921;\n  background-color: #fff0ba;\n}",
+        "task": "Create a class for your alternate page theme. Give it a different background from your normal page style.",
+        "language": "css"
+      },
+      {
+        "title": "2. Toggle a state",
+        "text": "classList.toggle adds a class when it is absent and removes it when it is present. It is useful when the same action must work in both directions.",
+        "code": "const card = document.querySelector(\"#recipe-card\");\ncard.classList.toggle(\"highlighted\");",
+        "task": "Your mission changes the page body, not a recipe card. How could your theme button toggle a class on that element?",
+        "language": "javascript"
+      },
+      {
+        "title": "3. Check both directions",
+        "text": "The class name in JavaScript must match the class name in CSS. You can inspect the body element’s class attribute to see whether it changed.",
+        "code": "console.log(document.body.className);",
+        "task": "Click once, then click again. If the class changes but the color does not, check your CSS selector and whether another rule overrides it.",
+        "language": "javascript"
+      }
+    ],
+    "checks": [
+      "The theme changes and switches back"
+    ]
+  },
+  {
+    "title": "Meet your server",
+    "focus": "Your first API call",
+    "goal": "Replace invented server information with a real response.",
+    "steps": [
+      "Read /api/info using the API reference link.",
+      "On page load, fetch /api/hostname/ and put its hostname into a visible element with id=hostname."
+    ],
+    "hints": [
+      {
+        "title": "1. Explore a real response",
+        "text": "An API returns structured data. The API reference opens /api/info. In this example we request that description, not the hostname.",
+        "code": "async function exploreApi() {\n  const response = await fetch(\"/api/info\");\n  const description = await response.json();\n  console.log(description);\n}\n\nexploreApi();",
+        "task": "Find the hostname endpoint in the reference. Notice that await is inside an async function and that the function is called at the end.",
+        "language": "javascript"
+      },
+      {
+        "title": "2. Read one field from JSON",
+        "text": "After response.json(), the result is a JavaScript object. Dot notation reads a named field. This example is invented recipe data, not an API response.",
+        "code": "const recipe = { title: \"Vegetable soup\", portions: 4 };\nconsole.log(recipe.title);",
+        "task": "Which field does the hostname response contain? Read that field rather than displaying the entire response object.",
+        "language": "javascript"
+      },
+      {
+        "title": "3. Connect data to the page",
+        "text": "You already know how to select an element and change its text. The value can come from an object instead of a fixed string.",
+        "code": "const heading = document.querySelector(\"#recipe-title\");\nheading.textContent = recipe.title;",
+        "task": "Adapt the idea to your hostname element and fetched data. Call your loading function when the page starts; do not wait for a click.",
+        "language": "javascript"
+      }
+    ],
+    "checks": [
+      "The hostname comes from the API"
+    ]
+  },
+  {
+    "title": "Bring the dashboard to life",
+    "focus": "A complete API dashboard",
+    "goal": "Display current information and communicate what happens during requests.",
+    "steps": [
+      "On page load, call /api/username/, /api/hostname/, /api/ip, and /api/metrics.",
+      "Display values in visible elements with ids username, hostname, addresses, cpu, memory, memory-limit, and uptime. Keep numeric metrics in their API units; labels may surround them. Display N/A for null metrics.",
+      "Add a button with id=refresh that reloads all four endpoints. Also refresh automatically every 5 seconds.",
+      "While requests are pending, show Loading in a visible element with id=status. Clear Loading after completion. On a failed HTTP response or network failure, show Error or Failed there; a later successful refresh must clear the error."
+    ],
+    "hints": [
+      {
+        "title": "1. Build one request at a time",
+        "text": "Start with the working hostname request. A small helper can read JSON from different endpoints. Check response.ok: fetch does not throw automatically for an HTTP 500 response.",
+        "code": "async function readJson(path) {\n  const response = await fetch(path);\n  if (!response.ok) {\n    throw new Error(\"Request failed: \" + response.status);\n  }\n  return response.json();\n}",
+        "task": "Use the API reference to discover each response’s fields. Add one endpoint and display its result before adding the next.",
+        "language": "javascript"
+      },
+      {
+        "title": "2. Show what is happening",
+        "text": "Use try for work that may fail, catch to report a failure, and finally for cleanup. This separate example reads the API description; it is not a dashboard refresh function.",
+        "code": "async function readDescription() {\n  console.log(\"Loading description…\");\n  try {\n    const description = await readJson(\"/api/info\");\n    console.log(description.name);\n  } catch (error) {\n    console.log(\"Failed to read description\");\n  } finally {\n    console.log(\"Request finished\");\n  }\n}",
+        "task": "Instead of console messages, show loading, success, and errors in your status element. A new attempt must clear an old error. Remember to call the function you write.",
+        "language": "javascript"
+      },
+      {
+        "title": "3. Reuse an action for a button and timer",
+        "text": "Define your refresh function once, then pass its name to a listener or timer. Passing a function schedules it; adding () calls it immediately.",
+        "code": "function showTime() {\n  console.log(new Date().toLocaleTimeString());\n}\n\nshowTime();\nsetInterval(showTime, 10000);",
+        "task": "Adapt this pattern for your refresh function and the mission’s interval. Timer delays are milliseconds: 1000 milliseconds is one second. Create the timer once, not inside the refresh function.",
+        "language": "javascript"
+      },
+      {
+        "title": "4. Handle lists and missing measurements",
+        "text": "An array can be joined into readable text. null means unavailable; 0 is still a real measurement. Avoid using value || \"N/A\", because that also replaces zero.",
+        "code": "const ingredients = [\"carrots\", \"potatoes\"];\nconsole.log(ingredients.join(\", \"));\n\nconst temperature = 0;\nconst label = temperature === null ? \"N/A\" : String(temperature);\nconsole.log(label);",
+        "task": "Which API field is an array? Which metrics can be null? Keep numeric values in the requested units and label them so the reader knows what they mean.",
+        "language": "javascript"
+      },
+      {
+        "title": "5. Avoid overlapping refreshes",
+        "text": "If a request is slow, another timer tick or click might arrive before it finishes. A flag can help you keep only one refresh in progress.",
+        "code": "let busy = false;\n\n// At the start of your async refresh function:\n// if (busy) return;\n// busy = true;\n\n// In its finally block:\n// busy = false;",
+        "task": "Keep earlier readings on screen while loading. Use Check my work to try delayed requests, errors, recovery, and null values that may not appear during a normal preview.",
+        "language": "javascript"
+      }
+    ],
+    "checks": [
+      "All four endpoints supply the displayed values",
+      "Refresh retrieves changed readings",
+      "Readings update automatically",
+      "Loading is visible and clears",
+      "HTTP failures are visible and recover",
+      "Network failures are visible and recover",
+      "Unavailable metrics show N/A"
+    ]
+  }
+]

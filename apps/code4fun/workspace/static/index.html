@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Code4Fun · My Server Dashboard</title>
+<link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script>
+</head>
+<body>
+<header class="topbar"><a class="brand" href="/" aria-label="Code4Fun home">code<span>4</span>fun</a><span class="project-title">My Server Dashboard</span><div class="header-actions"><button id="tutorial-open" class="quiet">Tutorial</button><button id="api-link" class="secondary">API reference</button></div></header>
+<main>
+<section class="workspace-heading"><h1>Workspace</h1><div class="progress" aria-label="Mission progress"><span id="progress-count">0/6</span><div class="progress-track" role="progressbar" aria-label="Completed missions" aria-valuemin="0" aria-valuemax="6" aria-valuenow="0"><div id="progress-fill"></div></div></div></section>
+<div class="workspace">
+<aside class="lesson panel"><details id="mission-picker"><summary id="mission-summary">Missions <span id="stage-number"></span></summary><nav id="stages" aria-label="Learning stages"></nav></details><div class="lesson-body"><p class="eyebrow" id="focus"></p><h2 id="lesson-title"></h2><p id="goal"></p><ol id="steps"></ol><details id="lesson-help"><summary>Need a little help?</summary><div id="hints"></div></details></div><div class="lesson-footer"><button id="previous" class="quiet">← Previous</button><button id="next" class="quiet">Next stage →</button></div></aside>
+<section class="editor panel" aria-label="Code editor"><div class="panel-label"><span>Files</span><span id="save-status">Loading…</span></div><div id="files" role="tablist" aria-label="Project files"></div><label id="editor-label" class="sr-only" for="code">Editing index.html</label><div class="code-area"><div id="line-numbers" aria-hidden="true">1</div><textarea id="code" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" aria-describedby="editor-help editor-keys"></textarea></div><span id="editor-keys" class="sr-only">Enter continues indentation. While the editor is focused, Tab inserts a tab or indents selected lines; Shift+Tab outdents the current or selected lines. Press Escape, then Tab or Shift+Tab to move focus outside the editor.</span><div class="editor-bottom"><span id="editor-help" title="Enter continues indentation. Escape then Tab moves focus outside the editor.">Tab / Shift+Tab · Ctrl/⌘ S</span><button class="quiet" id="download">Download backup ↓</button></div><div class="toolbar"><button id="save" class="secondary">Save project</button><button id="run" class="primary">Run preview <span>▶</span></button></div></section>
+<section class="preview panel" aria-label="Website preview and checks"><div class="panel-label"><span>Preview</span><button id="rerun" class="quiet" aria-label="Reload preview">Reload</button></div><iframe id="preview" title="Your dashboard preview" sandbox="allow-scripts allow-same-origin"></iframe><div class="check-area"><div class="check-heading"><div><h2>Checkpoint</h2><p id="check-caption">Test the current stage’s requirements.</p></div><button id="check" class="secondary">Check my work</button></div><ul id="results" aria-live="polite"></ul><p class="check-note">Checks use example API data. Your normal preview uses the live API container.</p></div></section>
+</div>
+<footer><span>Your files stay with you as you switch missions.</span><button id="reset" class="quiet danger">Reset entire project</button></footer>
+<div id="recovery" class="recovery" hidden><div><strong>A browser draft is available.</strong><p id="recovery-detail"></p></div><button id="recover" class="secondary">Recover draft</button><button id="discard" class="quiet">Discard draft</button></div>
+<p id="notice" role="status" aria-live="polite"></p>
+</main>
+<dialog id="api-dialog" aria-labelledby="api-title"><div class="dialog-heading"><h2 id="api-title">API reference</h2><button id="api-close" class="quiet" aria-label="Close API reference">Close ✕</button></div><p>Use these GET endpoints to read information from the API container.</p><div id="api-content" aria-live="polite"></div><button id="api-retry" class="secondary" hidden>Try again</button></dialog>
+<dialog id="tutorial-dialog" aria-labelledby="tutorial-title" aria-describedby="tutorial-text">
+<div id="tour-spotlight" aria-hidden="true" hidden></div>
+<div id="tutorial-card"><div id="tutorial-surface" aria-hidden="true"></div><div id="tutorial-content">
+<div class="dialog-heading"><span id="tutorial-count"></span><button id="tutorial-skip" class="quiet">Skip tutorial</button></div>
+<h2 id="tutorial-title"></h2><p id="tutorial-text"></p>
+<div id="tutorial-topics" role="group" aria-label="Course topics"></div>
+<div id="tutorial-example" class="course-example" hidden><div class="example-source"><span id="example-language" class="example-label"></span><pre><code id="example-code"></code></pre></div><div class="example-output"><span class="example-label">Result</span><div id="example-preview"></div></div></div>
+<button id="tutorial-try" class="secondary" hidden></button><p id="tutorial-error" role="status"></p>
+<div class="tutorial-controls"><button id="tutorial-back" class="quiet">Back</button><button id="tutorial-next" class="primary">Next</button></div>
+</div></div>
+</dialog>
+<aside id="success-toast" class="success-toast" role="status" aria-live="polite" hidden><div><strong>Checkpoint passed!</strong><p>Your progress is saved.</p></div><button id="toast-close" class="quiet" aria-label="Dismiss checkpoint notification">✕</button><div class="toast-track"><div id="toast-duration"></div></div></aside>
+</body></html>
